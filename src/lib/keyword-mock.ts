@@ -1,31 +1,17 @@
-// 쇼핑몰 키워드 확장 목업 데이터 생성기
+// 매체(쇼핑몰·검색엔진) 키워드 확장 목업 데이터 생성기
 // 실제 크롤링 없이, 키워드 문자열 기반의 "결정적(deterministic)" 의사난수로
 // 매 렌더마다 동일한 결과가 나오도록 생성한다. (Math.random 미사용)
 
 import type {
+  Channel,
+  ChannelKey,
   CollectionSet,
   DiscoveredTerm,
   KeywordResult,
-  MallKey,
-  Mall,
   Metrics,
   RegisteredKeyword,
 } from "@/types/keyword";
-
-/** 지원 쇼핑몰 9개 — 단일 출처. label 은 example.csv 헤더와 동일. */
-export const MALLS: Mall[] = [
-  { key: "coupang", label: "쿠팡", fullName: "쿠팡" },
-  { key: "gmarket", label: "G마켓", fullName: "G마켓" },
-  { key: "auction", label: "옥션", fullName: "옥션" },
-  { key: "elevenst", label: "11번가", fullName: "11번가" },
-  { key: "ssg", label: "SSG", fullName: "SSG.COM" },
-  { key: "lotteon", label: "롯데ON", fullName: "롯데ON" },
-  { key: "emart", label: "이마트몰", fullName: "이마트몰" },
-  { key: "ali", label: "알리", fullName: "알리익스프레스" },
-  { key: "temu", label: "테무", fullName: "테무" },
-];
-
-export const MALL_KEYS: MallKey[] = MALLS.map((m) => m.key);
+import { channelKeys } from "@/lib/channels";
 
 /** 연관/자동완성 검색어 목업용 접미사 풀 */
 const TERM_SUFFIXES = [
@@ -84,20 +70,28 @@ function makeMetrics(rand: () => number): Metrics {
   return { impressions, clicks, ctr, cpc, cost };
 }
 
-function makeFlags(rand: () => number, minTrue = 1): Record<MallKey, boolean> {
-  const flags = {} as Record<MallKey, boolean>;
-  MALL_KEYS.forEach((k) => {
+function makeFlags(
+  rand: () => number,
+  keys: ChannelKey[],
+  minTrue = 1
+): Record<ChannelKey, boolean> {
+  const flags: Record<ChannelKey, boolean> = {};
+  keys.forEach((k) => {
     flags[k] = rand() > 0.62;
   });
   // 최소 minTrue 개는 O 가 되도록 보정 (모두 X 인 무의미한 행 방지)
-  if (MALL_KEYS.filter((k) => flags[k]).length < minTrue) {
-    flags[MALL_KEYS[Math.floor(rand() * MALL_KEYS.length)]] = true;
+  if (keys.filter((k) => flags[k]).length < minTrue) {
+    flags[keys[Math.floor(rand() * keys.length)]] = true;
   }
   return flags;
 }
 
 /** 등록 키워드 1개 → 결정적 목업 수집 결과 */
-export function generateResult(kw: RegisteredKeyword): KeywordResult {
+export function generateResult(
+  kw: RegisteredKeyword,
+  channels: Channel[]
+): KeywordResult {
+  const keys = channelKeys(channels);
   const rand = mulberry32(hashString(kw.keyword) ^ 0x9e3779b9);
   const count = 5 + Math.floor(rand() * 8); // 5 ~ 12 개
 
@@ -112,8 +106,8 @@ export function generateResult(kw: RegisteredKeyword): KeywordResult {
     used.add(term);
     terms.push({
       term,
-      autocomplete: makeFlags(rand),
-      related: makeFlags(rand),
+      autocomplete: makeFlags(rand, keys),
+      related: makeFlags(rand, keys),
       pc: makeMetrics(rand),
       mobile: makeMetrics(rand),
     });
@@ -122,8 +116,11 @@ export function generateResult(kw: RegisteredKeyword): KeywordResult {
   return { keyword: kw.keyword, targetRank: kw.targetRank, terms };
 }
 
-export function generateResults(keywords: RegisteredKeyword[]): KeywordResult[] {
-  return keywords.map(generateResult);
+export function generateResults(
+  keywords: RegisteredKeyword[],
+  channels: Channel[]
+): KeywordResult[] {
+  return keywords.map((kw) => generateResult(kw, channels));
 }
 
 /** 목업 초기 목록용 사전 생성 항목 개수 (페이징 확인용으로 20개 이상) */
@@ -141,7 +138,10 @@ function daysAgoString(base: Date, days: number): string {
  * SAMPLE_BULK_KEYWORDS 를 순환 조합해 각 항목당 2~4개 키워드를 담는다.
  * seq 는 1..count, 최신(큰 seq)이 앞에 오도록 내림차순 정렬해 반환한다.
  */
-export function generateSampleSets(count: number = SAMPLE_SET_COUNT): CollectionSet[] {
+export function generateSampleSets(
+  channels: Channel[],
+  count: number = SAMPLE_SET_COUNT
+): CollectionSet[] {
   const base = new Date();
   const sets: CollectionSet[] = [];
 
@@ -162,7 +162,7 @@ export function generateSampleSets(count: number = SAMPLE_SET_COUNT): Collection
       name: `no_${seq}`,
       createdAt: daysAgoString(base, count - seq),
       keywords,
-      results: generateResults(keywords),
+      results: generateResults(keywords, channels),
     });
   }
 

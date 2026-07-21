@@ -24,7 +24,13 @@ export function Header() {
             href="/keyword-expansion"
             className="text-gray-600 hover:text-gray-900 transition-colors"
           >
-            키워드 확장
+            쇼핑몰 키워드 확장
+          </Link>
+          <Link
+            href="/search-keyword-expansion"
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            검색엔진 키워드 확장
           </Link>
         </nav>
         

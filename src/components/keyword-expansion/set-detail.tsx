@@ -2,15 +2,16 @@
 
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { CollectionSet } from "@/types/keyword";
+import type { Channel, CollectionSet } from "@/types/keyword";
 import { ResultMatrixTable } from "@/components/keyword-expansion/result-matrix-table";
 
 interface SetDetailProps {
   set: CollectionSet;
+  channels: Channel[];
   onDownload: (set: CollectionSet) => void;
 }
 
-export function SetDetail({ set, onDownload }: SetDetailProps) {
+export function SetDetail({ set, channels, onDownload }: SetDetailProps) {
   const termCount = set.results.reduce((n, r) => n + r.terms.length, 0);
 
   return (
@@ -29,7 +30,7 @@ export function SetDetail({ set, onDownload }: SetDetailProps) {
         </Button>
       </div>
 
-      <ResultMatrixTable results={set.results} />
+      <ResultMatrixTable results={set.results} channels={channels} />
     </div>
   );
 }

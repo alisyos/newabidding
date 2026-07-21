@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Binoculars,
+  Globe,
   Megaphone,
   MessageSquareQuote,
   Search,
@@ -24,6 +25,17 @@ export const AGENTS: Agent[] = [
     tags: ["자동완성", "연관검색어", "네이버", "쿠팡", "수집"],
     status: "available",
     icon: Search,
+  },
+  {
+    id: "search-keyword-expansion",
+    name: "검색엔진 키워드 확장",
+    description:
+      "네이버·다음·구글 검색창의 자동완성 검색어와 연관검색어를 한 번에 수집합니다.",
+    href: "/search-keyword-expansion",
+    category: "키워드",
+    tags: ["자동완성", "연관검색어", "네이버", "다음", "구글", "검색엔진"],
+    status: "available",
+    icon: Globe,
   },
   {
     id: "rank-tracking",

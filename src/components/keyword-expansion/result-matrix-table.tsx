@@ -1,12 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { MALLS, MALL_KEYS } from "@/lib/keyword-mock";
+import { channelKeys } from "@/lib/channels";
 import { formatNumber, formatCtr } from "@/lib/keyword-csv";
-import type { KeywordResult, MallKey, Metrics } from "@/types/keyword";
+import type { Channel, ChannelKey, KeywordResult, Metrics } from "@/types/keyword";
 
 interface ResultMatrixTableProps {
   results: KeywordResult[];
+  channels: Channel[];
 }
 
 const METRIC_LABELS = ["노출수", "클릭수", "CTR", "CPC", "광고비"];
@@ -34,9 +35,10 @@ function metricValues(m: Metrics): string[] {
   ];
 }
 
-export function ResultMatrixTable({ results }: ResultMatrixTableProps) {
+export function ResultMatrixTable({ results, channels }: ResultMatrixTableProps) {
   const th = "border px-2 py-1.5 text-center text-xs font-medium whitespace-nowrap";
   const td = "border px-2 py-1.5 text-center text-xs whitespace-nowrap";
+  const keys = channelKeys(channels);
 
   return (
     <div className="w-full overflow-auto rounded-md border">
@@ -49,10 +51,10 @@ export function ResultMatrixTable({ results }: ResultMatrixTableProps) {
             <th className={th} rowSpan={2}>
               연관 키워드
             </th>
-            <th className={cn(th, "bg-primary/5")} colSpan={MALL_KEYS.length}>
+            <th className={cn(th, "bg-primary/5")} colSpan={channels.length}>
               자동 완성 검색어
             </th>
-            <th className={th} colSpan={MALL_KEYS.length}>
+            <th className={th} colSpan={channels.length}>
               연관 검색어
             </th>
             <th className={th} rowSpan={2}>
@@ -66,14 +68,14 @@ export function ResultMatrixTable({ results }: ResultMatrixTableProps) {
             </th>
           </tr>
           <tr>
-            {MALLS.map((m) => (
-              <th key={`auto-${m.key}`} className={cn(th, "bg-primary/5")}>
-                {m.label}
+            {channels.map((c) => (
+              <th key={`auto-${c.key}`} className={cn(th, "bg-primary/5")}>
+                {c.label}
               </th>
             ))}
-            {MALLS.map((m) => (
-              <th key={`rel-${m.key}`} className={th}>
-                {m.label}
+            {channels.map((c) => (
+              <th key={`rel-${c.key}`} className={th}>
+                {c.label}
               </th>
             ))}
             {METRIC_LABELS.map((l) => (
@@ -96,12 +98,12 @@ export function ResultMatrixTable({ results }: ResultMatrixTableProps) {
                   {i === 0 ? result.keyword : ""}
                 </td>
                 <td className={cn(td, "text-left font-medium")}>{term.term}</td>
-                {MALL_KEYS.map((k: MallKey) => (
+                {keys.map((k: ChannelKey) => (
                   <td key={`a-${k}`} className={td}>
                     <Flag on={term.autocomplete[k]} />
                   </td>
                 ))}
-                {MALL_KEYS.map((k: MallKey) => (
+                {keys.map((k: ChannelKey) => (
                   <td key={`r-${k}`} className={td}>
                     <Flag on={term.related[k]} />
                   </td>

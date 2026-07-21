@@ -1,20 +1,11 @@
-// 쇼핑몰 키워드 확장(자동완성·연관검색어) 목업 타입 정의
+// 매체(쇼핑몰·검색엔진) 키워드 확장(자동완성·연관검색어) 목업 타입 정의
 
-/** 지원 쇼핑몰 식별자 */
-export type MallKey =
-  | "coupang"
-  | "gmarket"
-  | "auction"
-  | "elevenst"
-  | "ssg"
-  | "lotteon"
-  | "emart"
-  | "ali"
-  | "temu";
+/** 매체 식별자 (예: coupang, naver) */
+export type ChannelKey = string;
 
-/** 쇼핑몰 메타 정보 */
-export interface Mall {
-  key: MallKey;
+/** 매체 메타 정보 */
+export interface Channel {
+  key: ChannelKey;
   /** CSV 헤더용 짧은 이름 (예: SSG, 알리) — example.csv 와 동일 */
   label: string;
   /** 화면 표시용 풀네임 (예: SSG.COM, 알리익스프레스) */
@@ -41,10 +32,10 @@ export interface Metrics {
 /** 수집된 연관/자동완성 검색어 1건 */
 export interface DiscoveredTerm {
   term: string;
-  /** 몰별 자동완성 검색어 노출 여부 */
-  autocomplete: Record<MallKey, boolean>;
-  /** 몰별 연관검색어 노출 여부 */
-  related: Record<MallKey, boolean>;
+  /** 매체별 자동완성 검색어 노출 여부 */
+  autocomplete: Record<ChannelKey, boolean>;
+  /** 매체별 연관검색어 노출 여부 */
+  related: Record<ChannelKey, boolean>;
   pc: Metrics;
   mobile: Metrics;
 }

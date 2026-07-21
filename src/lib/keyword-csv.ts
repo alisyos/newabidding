@@ -1,8 +1,8 @@
 // example.csv 와 동일한 구조의 CSV 문자열을 생성/다운로드한다.
 // 인코딩: 브라우저 제약상 UTF-8 + BOM 으로 내보낸다(엑셀에서 한글 정상 표시).
 
-import type { KeywordResult, Metrics } from "@/types/keyword";
-import { MALLS, MALL_KEYS } from "@/lib/keyword-mock";
+import type { Channel, KeywordResult, Metrics } from "@/types/keyword";
+import { channelKeys } from "@/lib/channels";
 
 /** 천단위 콤마 포맷 */
 export function formatNumber(n: number): string {
@@ -33,13 +33,26 @@ function metricCells(m: Metrics): string[] {
   ];
 }
 
+export interface CsvOptions {
+  /** CSV 1행 제목 (예: 쇼핑몰 키워드 확장) */
+  title: string;
+  channels: Channel[];
+}
+
 /** 결과 → example.csv 구조의 CSV 문자열 */
-export function buildCsv(results: KeywordResult[], createdDate: string): string {
+export function buildCsv(
+  results: KeywordResult[],
+  createdDate: string,
+  { title, channels }: CsvOptions
+): string {
   const rows: string[][] = [];
   const emptyN = (n: number) => Array(n).fill("");
+  const keys = channelKeys(channels);
+  // 매체 그룹은 첫 칸이 그룹명이므로 나머지 칸을 공백으로 채운다
+  const channelPad = channels.length - 1;
 
   // 1행 제목, 2행 생성일, 3행 공백
-  rows.push(["쇼핑몰 키워드 확장"]);
+  rows.push([title]);
   rows.push([`생성일: ${createdDate}`]);
   rows.push([]);
 
@@ -48,9 +61,9 @@ export function buildCsv(results: KeywordResult[], createdDate: string): string 
     "키워드",
     "연관 키워드",
     "자동 완성 검색어",
-    ...emptyN(8),
+    ...emptyN(channelPad),
     "연관 키워드",
-    ...emptyN(8),
+    ...emptyN(channelPad),
     "목표 순위",
     "PC",
     ...emptyN(4),
@@ -59,7 +72,7 @@ export function buildCsv(results: KeywordResult[], createdDate: string): string 
   ]);
 
   // 5행: 서브 헤더
-  const mallLabels = MALLS.map((m) => m.label);
+  const channelLabels = channels.map((c) => c.label);
   const metricHeaders = [
     "예상 노출수",
     "예상 클릭수",
@@ -70,8 +83,8 @@ export function buildCsv(results: KeywordResult[], createdDate: string): string 
   rows.push([
     "",
     "",
-    ...mallLabels,
-    ...mallLabels,
+    ...channelLabels,
+    ...channelLabels,
     "",
     ...metricHeaders,
     ...metricHeaders,
@@ -83,8 +96,8 @@ export function buildCsv(results: KeywordResult[], createdDate: string): string 
       rows.push([
         result.keyword,
         term.term,
-        ...MALL_KEYS.map((k) => (term.autocomplete[k] ? "O" : "X")),
-        ...MALL_KEYS.map((k) => (term.related[k] ? "O" : "X")),
+        ...keys.map((k) => (term.autocomplete[k] ? "O" : "X")),
+        ...keys.map((k) => (term.related[k] ? "O" : "X")),
         String(result.targetRank),
         ...metricCells(term.pc),
         ...metricCells(term.mobile),
