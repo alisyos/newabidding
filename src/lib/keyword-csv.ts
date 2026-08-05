@@ -121,6 +121,8 @@ export function buildTemplateCsv(): string {
   return `﻿${body}`;
 }
 
+export { cell as escapeCsvCell };
+
 /** CSV 문자열을 파일로 다운로드 */
 export function downloadCsv(filename: string, csv: string): void {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });

@@ -4,6 +4,7 @@ import { ExpansionView } from "@/components/keyword-expansion/expansion-view";
 export default function KeywordExpansionPage() {
   return (
     <ExpansionView
+      agentId="keyword-expansion"
       title="쇼핑몰 키워드 확장"
       description={
         <>

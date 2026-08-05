@@ -4,11 +4,12 @@ import {
   Globe,
   Megaphone,
   MessageSquareQuote,
+  PenLine,
   Search,
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import type { Agent } from "@/types/agent";
+import type { Agent, AgentId } from "@/types/agent";
 
 /**
  * 홈 화면 카드 목록.
@@ -82,6 +83,17 @@ export const AGENTS: Agent[] = [
     icon: Binoculars,
   },
   {
+    id: "ad-copy-generator",
+    name: "광고 문구 생성",
+    description:
+      "네이버·카카오·구글 검색광고 규정에 맞는 광고 문구를 매체별로 자동 생성합니다.",
+    href: "/ad-copy",
+    category: "광고",
+    tags: ["광고문구", "카피라이팅", "네이버", "카카오", "구글", "AI"],
+    status: "available",
+    icon: PenLine,
+  },
+  {
     id: "ad-keyword-recommend",
     name: "광고 키워드 추천",
     description:
@@ -109,3 +121,8 @@ export const AGENTS: Agent[] = [
 export const CATEGORIES: string[] = Array.from(
   new Set(AGENTS.map((a) => a.category))
 );
+
+/** id로 에이전트 이름 조회 (포인트 사용 내역 표시용) */
+export function agentName(id: AgentId): string {
+  return AGENTS.find((a) => a.id === id)?.name ?? id;
+}

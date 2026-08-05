@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "specVersion": "1.0.0",
+  "lastUpdated": "2026-08-04",
+  "description": "검색광고 매체별 광고문구 자동생성/검증용 구조화 명세. length_mode에 따라 글자수 카운팅 방식이 다르므로 반드시 매체별 counter를 적용할 것.",
+  "notes": {
+    "verification": "confirmed=공식/교차확인, review_required=공식 등록화면에서 최종 검증 필요",
+    "counting_modes": {
+      "GRAPHEME_1": "모든 문자(한글/영문/숫자/공백) 1자=1카운트. 네이버·카카오 방식.",
+      "GOOGLE_CJK_2": "한도값은 고정, ASCII=1카운트, 전각 CJK(한글음절/한자/가나/전각기호)=2카운트. 구글 방식. 한글 실질 입력수 = floor(limit/2)."
+    }
+  },
+
+  "counters": {
+    "GRAPHEME_1": {
+      "algorithm": "[...str].length 기준. Array.from(str).length 로 서로게이트 페어 안전 처리. 공백 포함.",
+      "cjkWeight": 1,
+      "asciiWeight": 1
+    },
+    "GOOGLE_CJK_2": {
+      "algorithm": "각 코드포인트가 전각 CJK 범위면 +2, 아니면 +1 누적.",
+      "cjkWeight": 2,
+      "asciiWeight": 1,
+      "cjkUnicodeRanges": [
+        "AC00-D7A3 (한글 음절)",
+        "1100-11FF, 3130-318F (한글 자모)",
+        "4E00-9FFF (CJK 통합한자)",
+        "3040-30FF (히라가나/가타카나)",
+        "FF00-FFEF (전각 영숫자/기호, 단 반각 가타카나 FF61-FF9F 제외 및 미지원)"
+      ]
+    }
+  },
+
+  "platforms": {
+
+    "naver": {
+      "displayName": "네이버 검색광고",
+      "console": "searchad.naver.com",
+      "length_mode": "GRAPHEME_1",
+      "review": {
+        "sla": "소재 통상 당일~영업일 1일 이내 / 브랜드검색 영업일 1~3일",
+        "prerequisite": "비즈채널(웹사이트) 검수 통과가 소재 노출의 전제",
+        "sla_status": "review_required"
+      },
+      "products": {
+        "powerlink": {
+          "displayName": "파워링크",
+          "fields": {
+            "title":       { "label": "제목", "min": 1,  "max": 15, "required": true, "status": "confirmed" },
+            "description": { "label": "설명", "min": 20, "max": 45, "required": true, "status": "confirmed" },
+            "displayUrl":  { "label": "표시URL", "rule": "연결URL과 동일 도메인, 비즈채널 등록 도메인", "status": "review_required" },
+            "landingUrl":  { "label": "연결URL", "rule": "비즈채널 등록 도메인과 일치", "status": "review_required" }
+          }
+        },
+        "powercontents": {
+          "displayName": "파워콘텐츠",
+          "fields": {
+            "title":       { "label": "제목", "max": 45, "status": "review_required" },
+            "description": { "label": "설명", "max": 45, "status": "review_required" },
+            "thumbnail":   { "label": "썸네일", "rule": "1개 필수, 저품질 이미지 반려", "status": "confirmed" }
+          }
+        },
+        "brand_search": {
+          "displayName": "브랜드검색",
+          "note": "메인이미지/타이틀문구/설명글 1·2단/부가정보(최대4)/썸네일(최대3) 구성. 픽셀 단위 검수. 문구별 정확한 글자수는 등록화면 확인 필요.",
+          "status": "review_required"
+        }
+      },
+      "extensions": {
+        "additional_title": { "label": "추가제목",  "max": 15, "count": 2, "status": "confirmed" },
+        "promo_phrase":     { "label": "홍보문구",  "max": 14, "count": 1, "status": "confirmed" },
+        "additional_desc":  { "label": "추가설명",  "max": 45, "count": 1, "status": "confirmed" },
+        "sublink":          { "label": "서브링크",  "titleMax": 6, "count": 4, "status": "count_confirmed_length_review" },
+        "price_link":       { "label": "가격링크",  "nameMax": 11, "count": 3, "priceMax": 99999999, "modifiers": ["~부터","~까지","선택안함"], "status": "confirmed" },
+        "image":            { "label": "파워링크 이미지", "maxBytes": 5242880, "maxPx": "2000x2000 이하 정사각형", "formats": ["BMP","JPG","JPEG","PNG"], "accountMax": 200, "status": "confirmed" },
+        "blog_review":      { "label": "블로그리뷰", "count": 5, "status": "confirmed" },
+        "others":           { "label": "계산/전화번호/위치정보/네이버예약/플레이스/홍보영상", "status": "review_required" }
+      }
+    },
+
+    "kakao": {
+      "displayName": "카카오 키워드광고",
+      "console": "business.kakao.com (다음 통합검색·카카오톡 지면)",
+      "length_mode": "GRAPHEME_1",
+      "countingNote": "한글/영문/숫자/공백 구분 없이 1자=1카운트 (공백 포함)",
+      "review": {
+        "sla": "등록 후 영업일 최대 2일 (집행 2~3영업일 전 등록 권장)",
+        "prerequisite": "광고대상 '운영중' 상태여야 심사 진행",
+        "sla_status": "review_required"
+      },
+      "products": {
+        "keyword_ad": {
+          "displayName": "키워드광고 기본소재",
+          "fields": {
+            "title":       { "label": "제목", "max": 15, "required": true, "status": "confirmed" },
+            "description": { "label": "설명문구", "max": 45, "required": true, "status": "confirmed" },
+            "displayUrl":  { "label": "표시URL", "rule": "캠페인 비즈채널 URL 자동 사용, 소재 단계 수정 불가", "status": "confirmed" },
+            "landingUrl":  { "label": "연결URL", "rule": "PC/모바일 각각 설정 가능", "status": "confirmed" }
+          }
+        }
+      },
+      "extensions": {
+        "thumbnail":       { "label": "썸네일",   "titleMax": 15, "descMax": 45, "image": "450x450px, 400KB 이하", "status": "review_required" },
+        "multi_thumbnail": { "label": "멀티썸네일", "titleMax": 15, "descMax": 45, "imageTextMax": 6, "imageCount": 3, "status": "review_required" },
+        "additional_title":{ "label": "추가제목",  "max": 24, "count": 1, "status": "review_required" },
+        "sublink":         { "label": "부가링크",  "textMax": 6, "count": 4, "status": "review_required" },
+        "headword":        { "label": "말머리",   "max": 17, "count": 1, "options": ["할인","이벤트","인증","연관기사"], "status": "review_required" },
+        "price_table":     { "label": "가격테이블", "textMax": 9, "count": 3, "status": "review_required" },
+        "calculator":      { "label": "계산하기",  "titleMax": 15, "descMax": 45, "restrictedTo": "금융(대출·보험)", "status": "review_required" },
+        "phone":           { "label": "전화번호",  "count": 1, "status": "confirmed" },
+        "talk_channel":    { "label": "톡채널",    "rule": "연동 카카오톡 채널", "status": "confirmed" }
+      }
+    },
+
+    "google": {
+      "displayName": "Google Ads 반응형 검색광고(RSA)",
+      "console": "ads.google.com",
+      "length_mode": "GOOGLE_CJK_2",
+      "criticalNote": "한도값은 언어 무관 고정. 한글 등 전각 CJK는 1자당 2카운트 소모 → 한글 실질 입력 글자수는 절반.",
+      "review": {
+        "sla": "대부분 1 영업일 이내, 2영업일 초과 시 확인 권장",
+        "reRreview": "소재 수정 시 검토 재시작, 수정 후 통상 24~48시간 내 자동 재검토",
+        "sla_status": "confirmed"
+      },
+      "products": {
+        "rsa": {
+          "displayName": "반응형 검색광고",
+          "fields": {
+            "headline":    { "label": "제목", "limit": 30, "cjkEffective": 15, "min": 3, "max": 15, "status": "confirmed" },
+            "description": { "label": "설명", "limit": 90, "cjkEffective": 45, "min": 2, "max": 4,  "status": "confirmed" },
+            "path":        { "label": "표시경로", "limit": 15, "cjkEffective": 7, "count": 2, "status": "confirmed" }
+          },
+          "pinning": {
+            "note": "제목 위치1~3, 설명 위치1~2 고정 가능. 단일 고정은 광고강도 저하. 위치당 2~3개 권장.",
+            "hardLimit": "review_required"
+          },
+          "serving": "자동 조합, 노출당 최대 제목3+설명2"
+        }
+      },
+      "extensions": {
+        "sitelink":          { "label": "사이트링크", "textLimit": 25, "textCjk": 12, "descLimit": 35, "descCjk": 17, "minCount": 2, "descStatus": "review_required" },
+        "callout":           { "label": "콜아웃",     "limit": 25, "cjk": 12, "minCount": 2, "maxShown": 10, "status": "confirmed" },
+        "structured_snippet":{ "label": "구조화된 스니펫", "valueLimit": 25, "valueCjk": 12, "minValues": 3, "headers": ["Amenities","Brands","Courses","Degree programs","Destinations","Featured hotels","Insurance coverage","Models","Neighborhoods","Service catalog","Shows","Styles","Types"], "status": "review_required" },
+        "price":             { "label": "가격",       "headerLimit": 25, "descLimit": 25, "minItems": 3, "maxItems": 8, "status": "review_required" },
+        "call":              { "label": "전화",       "rule": "국가별 형식 검증", "status": "confirmed" }
+      }
+    }
+  },
+
+  "prohibited_rules": {
+    "common": {
+      "superlative": {
+        "desc": "최상급/배타성 표현(최고,1위,최저,유일,국내유일,No.1,Best)",
+        "rule": "객관적 증빙(공신력 조사기관 자료/수상/통계) 또는 랜딩페이지 내 확인 없으면 사용 불가",
+        "action": "generation 단계에서 플래그 → 근거 필드 요구"
+      },
+      "false_exaggeration": "허위·과장, 사실과 다른 내용, 부분사실의 전체화",
+      "comparison_disparagement": "부당 비교, 경쟁사 비방",
+      "profanity_hate": "비속어·은어, 혐오·차별(인종/성별/나이/장애/종교)",
+      "rights": "상표권/저작권/초상권 침해",
+      "landing_mismatch": "소재 문구와 실제 랜딩페이지 내용 불일치"
+    },
+    "special_characters": {
+      "naver": "과도한 특수문자·반복기호(!,^^,*) 지양. 이모지 비권장(review_required)",
+      "kakao": "의미전달 목적만 허용, 반복(!!!!)·이모티콘(^^,ㅠㅠ)·장식기호(☆○◇♡ 등) 불가",
+      "google": "연속 반복(!!)·문자내 기호치환(fl@wers)·구두점분해(F.L.O.W.E.R.S)·장식별표(*text*)·이모지·반각가타카나·위첨자 금지"
+    },
+    "capitalization_google": "전체대문자(FLOWERS)·눈속임 대소문자(FlOwErS) 금지. 통용약어/쿠폰코드/브랜드명 예외",
+    "spelling_spacing": {
+      "common": "맞춤법·띄어쓰기 정확성 요구, 눈속임 간격/불필요 공백 금지",
+      "google_repetition": "같은 광고그룹/캠페인/계정 내 애셋 간 중복 문구 금지"
+    },
+    "industry_review": {
+      "medical": "의료광고 사전심의 대상, 심의필 번호 필요",
+      "health_food": "질병 예방·치료 효능 표현 금지, 기능성 표시 심의 대상",
+      "finance": "금리·수수료 필수고지, 준법감시 준수, 증빙 필요",
+      "kakao_prohibited_industries": "담배/도박/불건전채팅/종교/게임아이템 현금거래/청소년유해매체 등 등록 불가"
+    }
+  }
+}

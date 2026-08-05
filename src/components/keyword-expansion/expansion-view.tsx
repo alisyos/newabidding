@@ -13,7 +13,14 @@ import {
 import { cn } from "@/lib/utils";
 import { generateResults, generateSampleSets } from "@/lib/keyword-mock";
 import { buildCsv, downloadCsv } from "@/lib/keyword-csv";
-import { usePointsStore, costForKeywords } from "@/store/points";
+import {
+  usePointsStore,
+  useAgentPrice,
+  useCurrentBalance,
+  useCurrentUserId,
+  costForKeywords,
+} from "@/store/points";
+import type { AgentId } from "@/types/agent";
 import type { Channel, CollectionSet, RegisteredKeyword } from "@/types/keyword";
 import { IndividualForm } from "@/components/keyword-expansion/individual-form";
 import { BulkUpload } from "@/components/keyword-expansion/bulk-upload";
@@ -39,6 +46,8 @@ function safeFileName(name: string): string {
 }
 
 interface ExpansionViewProps {
+  /** 과금 대상 에이전트 — 차감 단가 조회와 사용 내역 기록에 사용 */
+  agentId: AgentId;
   /** 페이지 제목 겸 CSV 1행 제목 */
   title: string;
   description: ReactNode;
@@ -48,6 +57,7 @@ interface ExpansionViewProps {
 }
 
 export function ExpansionView({
+  agentId,
   title,
   description,
   channels,
@@ -67,7 +77,9 @@ export function ExpansionView({
   const nextSetSeq = () => ++setSeq.current;
 
   const deduct = usePointsStore((s) => s.deduct);
-  const balance = usePointsStore((s) => s.balance);
+  const balance = useCurrentBalance();
+  const currentUserId = useCurrentUserId();
+  const unitPrice = useAgentPrice(agentId);
 
   const addOne = (keyword: string, targetRank: number) => {
     setStaged((prev) =>
@@ -96,10 +108,17 @@ export function ExpansionView({
   const registerSet = () => {
     if (staged.length === 0) return;
 
-    const cost = costForKeywords(staged.length);
-    if (!deduct(cost)) {
+    const cost = costForKeywords(staged.length, unitPrice);
+    if (
+      !deduct({
+        userId: currentUserId,
+        agentId,
+        amount: cost,
+        detail: `키워드 ${staged.length}건`,
+      })
+    ) {
       toast.error(
-        `포인트가 부족합니다. (필요 ${cost.toLocaleString()}P · 보유 ${balance.toLocaleString()}P)`
+        `포인트가 부족합니다. (필요 ${cost.toLocaleString()}P · 보유 ${balance.toLocaleString()}P) 관리자 페이지에서 충전해주세요.`
       );
       return;
     }
@@ -220,6 +239,7 @@ export function ExpansionView({
                 <h3 className="text-sm font-semibold">등록 대기 목록</h3>
                 <RegisteredList
                   items={staged}
+                  unitPrice={unitPrice}
                   onRemove={removeStaged}
                   onClear={clearStaged}
                   onRegister={registerSet}

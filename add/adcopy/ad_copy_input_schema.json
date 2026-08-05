@@ -1,0 +1,136 @@
+{
+  "specVersion": "1.0.0",
+  "lastUpdated": "2026-08-04",
+  "description": "검색광고 광고문구 자동생성 시스템의 사용자 입력값 스키마. search_ad_copy_spec.json과 짝을 이룸. tier(필수/권장/선택)로 구분하여 UX 단계별 노출 설계에 사용.",
+  "tiers": {
+    "required": "이 값이 없으면 생성 자체가 불가하거나 매체 제약을 결정할 수 없음",
+    "recommended": "생성 품질을 크게 좌우. UX상 강하게 유도",
+    "optional": "고급 제어. 기본값으로 대체 가능"
+  },
+
+  "fields": {
+
+    "A_설정": {
+      "media": {
+        "label": "대상 매체", "tier": "required", "type": "multi-select",
+        "options": ["naver", "kakao", "google"],
+        "drives": "매체별 글자수 카운터(GRAPHEME_1 / GOOGLE_CJK_2)와 소재 구조 결정"
+      },
+      "productType": {
+        "label": "상품 유형", "tier": "required", "type": "select",
+        "options": {
+          "naver": ["powerlink", "powercontents", "brand_search"],
+          "kakao": ["keyword_ad"],
+          "google": ["rsa"]
+        },
+        "drives": "필드별 글자수 한도·개수(min/max)·확장소재 종류 결정"
+      },
+      "landingUrl": {
+        "label": "연결(랜딩) URL", "tier": "required", "type": "url",
+        "drives": "문구-랜딩 일치 검증, 표시URL 도출, (옵션) 랜딩 크롤링으로 혜택 자동 추출",
+        "note": "네이버·카카오는 비즈채널 등록 도메인과 일치해야 함. 카카오 표시URL은 비즈채널 URL 고정."
+      },
+      "industry": {
+        "label": "업종/카테고리", "tier": "required", "type": "select",
+        "drives": "업종별 심의 규칙 활성화(의료 심의필/건기식 효능표현/금융 필수고지), 톤 기본값",
+        "note": "카카오 등록불가 업종(담배·도박·불건전채팅·종교 등) 여기서 차단"
+      }
+    },
+
+    "B_비즈니스": {
+      "brandName": {
+        "label": "브랜드/상호명", "tier": "recommended", "type": "text",
+        "drives": "제목 내 브랜드 노출 여부, 상표권 예외(대문자·특수문자 허용) 처리"
+      },
+      "productName": {
+        "label": "제품/서비스명", "tier": "recommended", "type": "text"
+      },
+      "bizChannelUrl": {
+        "label": "비즈채널 URL", "tier": "optional", "type": "url",
+        "drives": "네이버·카카오 표시URL. 미입력 시 landingUrl 도메인 사용",
+        "appliesTo": ["naver", "kakao"]
+      }
+    },
+
+    "C_소구정보": {
+      "targetKeywords": {
+        "label": "타깃 키워드", "tier": "required", "type": "text[]",
+        "drives": "제목 앞부분 반영(관련성·볼드 처리). CTR에 가장 직접적",
+        "note": "키워드별로 소재를 다르게 생성할지(키워드 단위 생성) 선택 가능하게 설계 권장"
+      },
+      "keyBenefits": {
+        "label": "핵심 혜택/셀링포인트", "tier": "required", "type": "text[]",
+        "example": ["무료배송", "당일출고", "10년 A/S", "100% 국내산"],
+        "drives": "제목·설명 본문 소재. 복수 입력받아 변형 다양성 확보"
+      },
+      "usp": {
+        "label": "차별점(경쟁사 대비)", "tier": "recommended", "type": "text" },
+      "promotion": {
+        "label": "프로모션", "tier": "recommended", "type": "object",
+        "fields": {
+          "discountRate": "할인율/할인액",
+          "period": "기간(긴급성 문구용)",
+          "event": "사은품·이벤트 내용"
+        },
+        "note": "할인율은 모든 이용자 공통 기준값만, 어떤 상품 기준인지 명시해야 반려 방지"
+      },
+      "price": {
+        "label": "가격 정보", "tier": "optional", "type": "object",
+        "drives": "네이버 가격링크(이름11자,최대99,999,999원)/카카오 가격테이블/구글 가격애셋",
+        "fields": { "itemName": "항목명", "amount": "금액", "qualifier": "부터/최대/평균 등" }
+      },
+      "cta": {
+        "label": "행동유도 유형", "tier": "recommended", "type": "select",
+        "options": ["상담신청", "구매하기", "무료견적", "예약", "다운로드", "가입"] },
+      "targetAudience": {
+        "label": "타깃 고객", "tier": "optional", "type": "object",
+        "fields": { "gender": "", "ageRange": "", "interests": "" },
+        "drives": "톤·어휘 조정" }
+    },
+
+    "D_표현제어": {
+      "toneAndManner": {
+        "label": "톤앤매너", "tier": "optional", "type": "select",
+        "options": ["신뢰형", "혜택강조형", "긴급형", "프리미엄", "친근형"],
+        "default": "혜택강조형" },
+      "mustInclude": {
+        "label": "필수 포함 문구", "tier": "optional", "type": "text[]",
+        "note": "법적 고지·브랜드 슬로건 등. 구글 pinning과 연계 가능" },
+      "excludeWords": {
+        "label": "제외/금칙어", "tier": "optional", "type": "text[]",
+        "note": "브랜드 자체 금칙어. 시스템 공통 금지표현과 별도" },
+      "superlative": {
+        "label": "최상급 표현 사용", "tier": "optional", "type": "object",
+        "fields": {
+          "use": "boolean",
+          "evidence": "근거 자료(수상내역/조사기관/통계 출처)"
+        },
+        "drives": "근거 있을 때만 '최고·1위·유일' 필터 우회 허용. 심의 대응 핵심",
+        "note": "evidence 없이 use=true면 생성 차단 또는 경고" },
+      "reviewNumber": {
+        "label": "심의필 번호", "tier": "conditional", "type": "text",
+        "requiredWhen": "industry in [의료, 건강기능식품 등 심의대상]" }
+    },
+
+    "E_생성옵션": {
+      "variantCount": {
+        "label": "생성 개수", "tier": "optional", "type": "object",
+        "note": "매체 min/max 범위 내. 예: 구글 RSA 제목 3~15, 설명 2~4",
+        "fields": { "headlines": "int", "descriptions": "int" },
+        "default": "매체 권장 최대치(다양성 확보)" },
+      "diversityLevel": {
+        "label": "변형 다양성", "tier": "optional", "type": "select",
+        "options": ["보수적", "균형", "실험적"], "default": "균형",
+        "drives": "혜택/가격/신뢰/긴급성/브랜드 등 서로 다른 소구축 분배" },
+      "language": {
+        "label": "언어", "tier": "optional", "type": "select", "default": "ko" }
+    }
+  },
+
+  "designNotes": {
+    "minimal_vs_rich": "셀프서비스(광고주 직접 입력)면 A+타깃키워드+핵심혜택만 필수로 두고 나머지는 자동/기본값. 내부 운영툴이면 전 항목 노출해 정밀 제어.",
+    "auto_prefill": "landingUrl 크롤링으로 brandName·keyBenefits·price를 자동 추출해 사용자는 확인·수정만 하게 하면 입력 부담 대폭 감소.",
+    "keyword_granularity": "targetKeywords를 여러 개 받아 키워드별로 소재를 개별 생성하면 관련성 점수가 올라감(특히 네이버·구글).",
+    "validation_loop": "입력값으로 생성 → 매체 카운터/금지표현 필터 검증 → 실패 시 재생성. 입력 단계에서 industry·superlative.evidence를 받아둬야 이 루프가 정확히 동작."
+  }
+}

@@ -10,11 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { POINT_PER_KEYWORD } from "@/store/points";
+import { costForKeywords } from "@/store/points";
 import type { RegisteredKeyword } from "@/types/keyword";
 
 interface RegisteredListProps {
   items: RegisteredKeyword[];
+  /** 키워드 1건당 차감 포인트 (관리자 페이지에서 설정) */
+  unitPrice: number;
   onRemove: (id: string) => void;
   onClear: () => void;
   onRegister: () => void;
@@ -22,11 +24,12 @@ interface RegisteredListProps {
 
 export function RegisteredList({
   items,
+  unitPrice,
   onRemove,
   onClear,
   onRegister,
 }: RegisteredListProps) {
-  const cost = items.length * POINT_PER_KEYWORD;
+  const cost = costForKeywords(items.length, unitPrice);
 
   return (
     <div className="space-y-4">
@@ -39,7 +42,7 @@ export function RegisteredList({
             <span className="font-semibold text-amber-600">
               {cost.toLocaleString()}P
             </span>{" "}
-            차감 (키워드당 {POINT_PER_KEYWORD}P)
+            차감 (키워드당 {unitPrice.toLocaleString()}P)
           </span>
         </p>
         <div className="flex gap-2">
