@@ -13,6 +13,16 @@ export {
   DialogTitle,
   DialogDescription,
 } from "./dialog"
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "./dropdown-menu"
 export { Input } from "./input"
 export { Label } from "./label"
 export { RadioGroup, RadioGroupItem } from "./radio-group"

@@ -60,6 +60,14 @@ export function buildSystemPrompt(media: AdMediaKey, input: AdCopyInput): string
 
   const industryLine = INDUSTRY_INSTRUCTIONS[input.industry];
 
+  // 사전심의 대상 업종은 심의필 번호가 실제 문구에 노출돼야 한다.
+  // 다만 제목까지 강제하면 안 된다 — "심의필 제2026-000호"는 한글 13자 안팎이라
+  // 네이버 제목 상한(15자)과 충돌해 거의 모든 제목이 글자수 위반이 되고,
+  // 그 위반이 보정 루프를 소진시켜 생성 지연과 비용만 늘어난다.
+  const reviewNumberLine = input.reviewNumber.trim()
+    ? `- 심의필 번호 "${input.reviewNumber.trim()}"를 ${desc.label} 중 최소 1개에 원문 그대로(변형·축약 없이) 포함하라. ${title.label}에는 넣지 마라.`
+    : null;
+
   return [
     `너는 ${spec.displayName}(${spec.productName}) 검색광고 카피라이터다. 모든 문구는 한국어로 작성한다.`,
     "",
@@ -80,6 +88,7 @@ export function buildSystemPrompt(media: AdMediaKey, input: AdCopyInput): string
     '- "저렴한 가격" 대신 "30% 할인", "빠른 배송" 대신 "당일 출고"처럼 구체적 숫자를 쓴다.',
     '- "지금 상담 신청", "무료 견적 받기"처럼 명확한 행동 유도(CTA)를 포함한다.',
     "- 설명은 제목이 다루지 못한 차별점(품질보증·배송·A/S·신뢰 요소)을 보완한다.",
+    ...(reviewNumberLine ? [reviewNumberLine] : []),
     diversityInstruction(input.diversityLevel),
     "",
     "[예시]",

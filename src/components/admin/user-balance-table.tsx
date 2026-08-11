@@ -234,7 +234,7 @@ export function UserBalanceTable() {
       <ConfirmDialog
         open={confirmReset}
         title="전체 잔액을 초기화할까요?"
-        description="모든 사용자의 보유 포인트가 샘플 기본값으로 되돌아갑니다. 단가와 사용 내역은 유지됩니다."
+        description="모든 사용자의 보유 포인트가 샘플 기본값으로 되돌아갑니다. 단가와 기존 사용 내역은 유지되며, 사용 내역에 초기화 기록이 사용자별로 1건씩 추가됩니다."
         confirmLabel="초기화"
         onClose={() => setConfirmReset(false)}
         onConfirm={() => {

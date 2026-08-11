@@ -4,8 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdvancedOptions } from "@/components/ad-copy/advanced-options";
 import { MediaSelect } from "@/components/ad-copy/media-select";
-import { SelectField } from "@/components/ad-copy/select-field";
-import { TagInput } from "@/components/ad-copy/tag-input";
+import { SelectField } from "@/components/common/select-field";
+import { TagInput } from "@/components/common/tag-input";
 import { CTAS, INDUSTRIES, blockedMediaFor } from "@/lib/ad-copy-spec";
 import type { AdCopyInput, AdMediaKey } from "@/types/ad-copy";
 

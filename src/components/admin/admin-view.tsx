@@ -157,7 +157,7 @@ export function AdminView() {
       <ConfirmDialog
         open={confirmResetAll}
         title="모두 기본값으로 초기화할까요?"
-        description={`차감 단가·사용자별 잔액·현재 사용자가 초기화되고, 샘플 사용 내역 ${SEED_LOG_COUNT}건이 다시 채워집니다. 되돌릴 수 없습니다.`}
+        description={`차감 단가·사용자별 잔액·현재 사용자가 기본값으로 돌아가고, 그동안 쌓인 사용 내역은 모두 지워진 뒤 샘플 사용 내역 ${SEED_LOG_COUNT}건으로 대체됩니다. 되돌릴 수 없습니다.`}
         confirmLabel="전체 초기화"
         onClose={() => setConfirmResetAll(false)}
         onConfirm={() => {

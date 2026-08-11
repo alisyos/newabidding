@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SelectField } from "@/components/ad-copy/select-field";
-import { TagInput } from "@/components/ad-copy/tag-input";
+import { SelectField } from "@/components/common/select-field";
+import { TagInput } from "@/components/common/tag-input";
 import {
   DIVERSITY_LEVELS,
   MEDIA_SPECS,
@@ -22,6 +22,12 @@ interface AdvancedOptionsProps {
   errors: Record<string, string>;
 }
 
+/**
+ * 이 영역 안에서만 렌더되는 검증 오류 키.
+ * 영역이 접혀 있으면 사용자가 볼 수 없으므로 자동 펼침 판단에 쓴다.
+ */
+const ADVANCED_ERROR_KEYS = ["superlative", "reviewNumber"] as const;
+
 /** 선택(optional) tier 입력 — 기본은 접혀 있다 */
 export function AdvancedOptions({
   value,
@@ -32,6 +38,15 @@ export function AdvancedOptions({
 
   const industry = findIndustry(value.industry);
   const needsReviewNumber = industry?.reviewNumberRequired === true;
+
+  const hasAdvancedError = ADVANCED_ERROR_KEYS.some((k) => Boolean(errors[k]));
+
+  // 고급 옵션 안의 오류는 영역이 접혀 있으면 화면에 뜨지 않는다.
+  // errors 는 검증할 때마다 새로 만들어지는 객체라, 같은 오류로 다시 제출해도 매번 펼쳐진다.
+  // (의존성을 hasAdvancedError 로만 두면 사용자가 한 번 접은 뒤에는 다시 펼쳐지지 않는다)
+  useEffect(() => {
+    if (hasAdvancedError) setOpen(true);
+  }, [errors, hasAdvancedError]);
 
   const setVariantCount = (
     media: AdMediaKey,
@@ -70,6 +85,12 @@ export function AdvancedOptions({
         <span className="text-xs font-normal">
           (톤앤매너 · 프로모션 · 가격 · 금칙어 · 생성 개수)
         </span>
+        {/* 사용자가 오류를 남긴 채 다시 접었을 때를 위한 표시 */}
+        {hasAdvancedError && (
+          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
+            확인 필요
+          </span>
+        )}
       </button>
 
       {open && (
@@ -296,7 +317,8 @@ export function AdvancedOptions({
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  {industry?.label}은 사전심의 대상 업종입니다.
+                  {/* 업종명 뒤에 은/는을 붙이면 "병의원/의료은"처럼 조사가 틀어진다 */}
+                  사전심의 대상 업종({industry?.label})입니다.
                 </p>
               )}
             </div>

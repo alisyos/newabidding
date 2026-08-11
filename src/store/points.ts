@@ -11,7 +11,7 @@ import { buildSeed } from "@/lib/point-seed";
 import { DEFAULT_USER_ID, isUserId } from "@/lib/users";
 import type { AgentId } from "@/types/agent";
 import type { AgentPriceMap, PointLog } from "@/types/points";
-import type { UserBalanceMap, UserId } from "@/types/user";
+import { USER_IDS, type UserBalanceMap, type UserId } from "@/types/user";
 
 /** 사용자 1인당 내역 보관 상한 — 한 사람의 활동이 다른 사용자 내역을 밀어내지 않게 한다 */
 export const MAX_LOGS_PER_USER = 60;
@@ -164,7 +164,32 @@ export const usePointsStore = create<PointsState>()(
 
       // 모듈 스코프의 initialSeed 를 재사용하면 객체 참조를 공유해
       // 이후 갱신이 초기값을 오염시키므로 매번 새로 만든다.
-      resetBalances: () => set({ balances: buildSeed().balances }),
+      resetBalances: () =>
+        set((s) => {
+          const balances = buildSeed().balances;
+          const at = Date.now();
+
+          // 잔액만 바꾸고 내역을 남기지 않으면 사용 내역의 최신 balanceAfter 가
+          // 잔액 관리 탭의 현재 잔액과 어긋난다. 사용자마다 초기화 기록을 1건씩 남긴다.
+          let logs = s.logs;
+          for (const userId of USER_IDS) {
+            logs = appendLog(logs, {
+              id: nextLogId(),
+              at,
+              userId,
+              type: "reset",
+              agentId: null,
+              detail: "전체 잔액 초기화",
+              // 증감은 0으로 둔다. 잔액 관리 탭의 총 사용/총 충전 집계가
+              // 타입이 아니라 amount 의 부호로 분류하기 때문에(user-balance-table.tsx),
+              // 실제 증감을 넣으면 초기화가 사용·충전 실적으로 잡힌다.
+              amount: 0,
+              balanceAfter: balanceOf(balances, userId),
+            });
+          }
+
+          return { balances, logs };
+        }),
 
       clearLogs: () => set({ logs: [] }),
 

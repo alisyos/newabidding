@@ -379,7 +379,18 @@ export async function POST(req: Request) {
   );
 
   const results: AdCopyMediaResult[] = settled.map((s, i) => {
-    if (s.status === "fulfilled") return s.value;
+    if (s.status === "fulfilled") {
+      // 호출은 성공했지만 문구가 한 건도 없으면 성공으로 볼 수 없다.
+      // 실패로 표시해 두면 아래의 "전 매체 실패 → 502" 승격이 이 경우까지 덮는다.
+      if (s.value.titles.length + s.value.descriptions.length === 0) {
+        return {
+          ...s.value,
+          status: "error",
+          errorMessage: "문구가 생성되지 않았습니다. 다시 시도해주세요.",
+        };
+      }
+      return s.value;
+    }
     return {
       media: input.media[i],
       status: "error",

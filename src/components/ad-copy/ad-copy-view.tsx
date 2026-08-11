@@ -16,7 +16,7 @@ import { AdCopyForm } from "@/components/ad-copy/ad-copy-form";
 import { AdCopyResults } from "@/components/ad-copy/ad-copy-results";
 import { buildAdCopyCsv } from "@/lib/ad-copy-csv";
 import { evaluateResults, flattenItems } from "@/lib/ad-copy-evaluate";
-import { MEDIA_SPECS, blockedMediaFor } from "@/lib/ad-copy-spec";
+import { MEDIA_SPECS, blockedMediaFor, findIndustry } from "@/lib/ad-copy-spec";
 import { downloadCsv } from "@/lib/keyword-csv";
 import { userName } from "@/lib/users";
 import {
@@ -111,6 +111,15 @@ function validateInput(input: AdCopyInput): Record<string, string> {
   if (input.superlative.use && !input.superlative.evidence.trim()) {
     errors.superlative =
       "최상급 표현을 쓰려면 객관적 근거를 입력해야 합니다. (근거 없으면 반려됩니다)";
+  }
+
+  // 사전심의 대상 업종(병의원/의료·건강기능식품)은 심의필 번호 없이 집행할 수 없다.
+  // 조건식은 필드 렌더 게이트(advanced-options.tsx)와 같은 식을 써서
+  // "필수인데 화면에 없는 필드" 상태가 생기지 않게 한다.
+  const industry = findIndustry(input.industry);
+  if (industry?.reviewNumberRequired === true && !input.reviewNumber.trim()) {
+    errors.reviewNumber =
+      "사전심의 대상 업종입니다. 고급 옵션에서 심의필 번호를 입력해주세요.";
   }
 
   return errors;
@@ -214,21 +223,36 @@ export function AdCopyView() {
       const results: AdCopyMediaResult[] = json.results ?? [];
       const okResults = results.filter((r) => r.status === "ok");
 
-      // 성공한 매체 기준으로만 과금한다
+      // 실제로 받은 문구 수만큼만 과금한다.
+      // 서버는 요청 개수를 slice 로 자르기만 하고 모자란 만큼 채우지 않으므로
+      // (strict 스키마가 minItems 를 강제하지 못한다) 요청 개수로 계산하면 과다 청구가 된다.
+      // 응답 배열 길이를 쓰면 생성 중 폼을 수정해도 차감액이 흔들리지 않는 효과도 있다.
+      const chargedResults = okResults.filter(
+        (r) => r.titles.length + r.descriptions.length > 0
+      );
       const chargedCost = costForAdCopy(
-        okResults.map((r) => countsFor(form, r.media)),
+        chargedResults.map((r) => ({
+          titles: r.titles.length,
+          descriptions: r.descriptions.length,
+        })),
         unitPrice
       );
-      const chargedCount = okResults.reduce((n, r) => {
-        const c = countsFor(form, r.media);
-        return n + c.titles + c.descriptions;
-      }, 0);
+      const chargedCount = chargedResults.reduce(
+        (n, r) => n + r.titles.length + r.descriptions.length,
+        0
+      );
+
+      // 한 건도 생성되지 않았으면 차감도 기록도 하지 않는다.
+      // 판단 기준은 금액이 아니라 건수다 — deduct 는 0P 사용도 일부러 기록하는데
+      // (단가를 0으로 설정한 무료 기능도 내역에 남기기 위함) 금액으로 막으면 그게 깨진다.
+      const charged = chargedResults.length > 0;
       if (
+        charged &&
         !deduct({
           userId: chargeUserId,
           agentId: AD_COPY_AGENT_ID,
           amount: chargedCost,
-          detail: `${okResults
+          detail: `${chargedResults
             .map((r) => MEDIA_SPECS[r.media].shortName)
             .join("·")} 문구 ${chargedCount}건`,
         })
@@ -254,7 +278,10 @@ export function AdCopyView() {
       setResultInput(snapshot);
       setRawResults(results);
       setSelectedIds(defaultSelected);
-      setActiveMedia(okResults[0]?.media ?? results[0]?.media ?? null);
+      // 문구가 실제로 담긴 탭을 먼저 연다 (빈 탭이 먼저 열리지 않도록)
+      setActiveMedia(
+        chargedResults[0]?.media ?? okResults[0]?.media ?? results[0]?.media ?? null
+      );
       setStatus("done");
 
       const failed = results.filter((r) => r.status === "error");
@@ -265,10 +292,23 @@ export function AdCopyView() {
             .join("·")} 매체는 생성에 실패했습니다.`
         );
       }
-      // 전 매체가 실패했다면 차감액이 0이므로 성공 토스트를 띄우지 않는다
-      if (okResults.length > 0) {
+      // 응답은 성공(ok)인데 문구가 한 건도 없는 매체 — 차감하지 않았음을 알린다
+      const empty = okResults.filter(
+        (r) => r.titles.length + r.descriptions.length === 0
+      );
+      if (empty.length > 0) {
+        toast.error(
+          `${empty
+            .map((r) => MEDIA_SPECS[r.media].shortName)
+            .join("·")} 매체는 생성된 문구가 없어 차감하지 않았습니다.`
+        );
+      }
+
+      // 실제로 생성된 문구가 있을 때만 성공 토스트를 띄운다.
+      // 건수를 함께 보여줘서 요청보다 적게 생성된 경우가 눈에 띄게 한다.
+      if (charged) {
         toast.success(
-          `광고문구 생성 완료 · ${userName(chargeUserId)}님 계정에서 ${chargedCost.toLocaleString()}P 차감되었습니다.`
+          `광고문구 ${chargedCount}건 생성 완료 · ${userName(chargeUserId)}님 계정에서 ${chargedCost.toLocaleString()}P 차감되었습니다.`
         );
       }
     } catch {

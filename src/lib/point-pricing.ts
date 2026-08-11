@@ -27,7 +27,11 @@ interface PricingMeta {
 export const PRICING_META: Record<AgentId, PricingMeta> = {
   "keyword-expansion": { unit: "keyword", defaultPrice: 10 },
   "search-keyword-expansion": { unit: "keyword", defaultPrice: 10 },
+  "blog-comments": { unit: "run", defaultPrice: 200 },
+  "instagram-comments": { unit: "run", defaultPrice: 200 },
+  "youtube-monitoring": { unit: "run", defaultPrice: 100 },
   "ad-copy-generator": { unit: "adCopy", defaultPrice: 5 },
+  "creative-brief": { unit: "run", defaultPrice: 300 },
   "rank-tracking": { unit: "run", defaultPrice: 100 },
   "product-name-optimizer": { unit: "run", defaultPrice: 50 },
   "review-analysis": { unit: "run", defaultPrice: 200 },

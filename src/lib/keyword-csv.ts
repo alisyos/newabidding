@@ -3,6 +3,7 @@
 
 import type { Channel, KeywordResult, Metrics } from "@/types/keyword";
 import { channelKeys } from "@/lib/channels";
+import { downloadFile } from "@/lib/download-file";
 
 /** 천단위 콤마 포맷 */
 export function formatNumber(n: number): string {
@@ -123,15 +124,7 @@ export function buildTemplateCsv(): string {
 
 export { cell as escapeCsvCell };
 
-/** CSV 문자열을 파일로 다운로드 */
+/** CSV 문자열을 파일로 다운로드 (Blob 처리는 download-file.ts 공용 헬퍼에 위임) */
 export function downloadCsv(filename: string, csv: string): void {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadFile(filename, csv, "text/csv;charset=utf-8;");
 }

@@ -31,13 +31,14 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 
 const PAGE_SIZE = 10;
 
-type TypeFilter = "all" | "use" | "charge";
+type TypeFilter = "all" | PointLog["type"];
 type UserFilter = "all" | UserId;
 
 const TYPE_FILTERS: { key: TypeFilter; label: string }[] = [
   { key: "all", label: "전체" },
   { key: "use", label: "사용" },
   { key: "charge", label: "충전·조정" },
+  { key: "reset", label: "초기화" },
 ];
 
 /** 구분 배지 */
@@ -74,8 +75,8 @@ export function UsageLogTable() {
     () =>
       logs.filter((log) => {
         if (userFilter !== "all" && log.userId !== userFilter) return false;
-        if (typeFilter === "use") return log.type === "use";
-        if (typeFilter === "charge") return log.type !== "use";
+        // all 을 뺀 모든 키가 PointLog["type"] 과 1:1로 대응한다
+        if (typeFilter !== "all" && log.type !== typeFilter) return false;
         return true;
       }),
     [logs, userFilter, typeFilter]
@@ -197,10 +198,16 @@ export function UsageLogTable() {
                     <TableCell
                       className={cn(
                         "text-right font-semibold",
-                        log.amount >= 0 ? "text-emerald-600" : "text-destructive"
+                        // 0 을 초록색 "+0P" 로 보여주면 늘어난 것처럼 읽힌다.
+                        // 초기화 기록과 단가 0(무료) 사용 기록이 여기에 해당한다.
+                        log.amount === 0
+                          ? "text-muted-foreground"
+                          : log.amount > 0
+                            ? "text-emerald-600"
+                            : "text-destructive"
                       )}
                     >
-                      {log.amount >= 0 ? "+" : ""}
+                      {log.amount > 0 ? "+" : ""}
                       {log.amount.toLocaleString()}P
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">

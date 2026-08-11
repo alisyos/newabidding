@@ -66,6 +66,13 @@ const SEED_ENTRIES: SeedEntry[] = [
   { userId: "u-jung", offsetMin: 6180, type: "use", agentId: "keyword-expansion", detail: "키워드 320건", amount: -3200 },
   { userId: "u-jung", offsetMin: 9120, type: "use", agentId: "search-keyword-expansion", detail: "키워드 280건", amount: -2800 },
   { userId: "u-jung", offsetMin: 12980, type: "use", agentId: "ad-copy-generator", detail: "카카오 문구 44건", amount: -220 },
+
+  // --- 수집 기능 (실행 1회당 과금) ---
+  { userId: "u-kim", offsetMin: 6300, type: "use", agentId: "blog-comments", detail: "댓글 428건", amount: -200 },
+  { userId: "u-lee", offsetMin: 8100, type: "use", agentId: "instagram-comments", detail: "댓글 316건", amount: -200 },
+  { userId: "u-park", offsetMin: 9400, type: "use", agentId: "youtube-monitoring", detail: '"국민연금" 영상 187건', amount: -100 },
+  { userId: "u-choi", offsetMin: 11700, type: "use", agentId: "youtube-monitoring", detail: '"청년적금" 영상 92건', amount: -100 },
+  { userId: "u-jung", offsetMin: 12100, type: "use", agentId: "blog-comments", detail: "댓글 651건", amount: -200 },
 ];
 
 export interface Seed {

@@ -8,11 +8,15 @@ import type { LucideIcon } from "lucide-react";
 export const AGENT_IDS = [
   "keyword-expansion",
   "search-keyword-expansion",
+  "blog-comments",
+  "instagram-comments",
+  "youtube-monitoring",
   "rank-tracking",
   "product-name-optimizer",
   "review-analysis",
   "competitor-monitoring",
   "ad-copy-generator",
+  "creative-brief",
   "ad-keyword-recommend",
   "category-trend",
 ] as const;

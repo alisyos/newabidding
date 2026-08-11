@@ -2,12 +2,16 @@ import {
   BarChart3,
   Binoculars,
   Globe,
+  Instagram,
+  Lightbulb,
   Megaphone,
+  MessageSquare,
   MessageSquareQuote,
   PenLine,
   Search,
   Sparkles,
   TrendingUp,
+  Youtube,
 } from "lucide-react";
 import type { Agent, AgentId } from "@/types/agent";
 
@@ -37,6 +41,39 @@ export const AGENTS: Agent[] = [
     tags: ["자동완성", "연관검색어", "네이버", "다음", "구글", "검색엔진"],
     status: "available",
     icon: Globe,
+  },
+  {
+    id: "blog-comments",
+    name: "네이버 블로그 댓글 수집",
+    description:
+      "네이버 블로그 게시글의 댓글과 답글을 전 페이지에 걸쳐 수집해 CSV로 내려받습니다.",
+    href: "/blog-comments",
+    category: "수집",
+    tags: ["네이버", "블로그", "댓글", "이벤트", "당첨자", "CSV"],
+    status: "available",
+    icon: MessageSquare,
+  },
+  {
+    id: "instagram-comments",
+    name: "인스타 댓글 수집",
+    description:
+      "인스타그램 게시물·릴스의 댓글과 답글을 수집해 CSV로 내려받습니다.",
+    href: "/instagram-comments",
+    category: "수집",
+    tags: ["인스타그램", "릴스", "댓글", "답글", "이벤트", "CSV"],
+    status: "available",
+    icon: Instagram,
+  },
+  {
+    id: "youtube-monitoring",
+    name: "유튜브 모니터링",
+    description:
+      "키워드와 기간으로 유튜브 영상을 검색해 조회수·좋아요·Shorts 여부를 한 번에 확인합니다.",
+    href: "/youtube-monitoring",
+    category: "수집",
+    tags: ["유튜브", "Shorts", "조회수", "모니터링", "영상", "CSV"],
+    status: "available",
+    icon: Youtube,
   },
   {
     id: "rank-tracking",
@@ -94,6 +131,17 @@ export const AGENTS: Agent[] = [
     icon: PenLine,
   },
   {
+    id: "creative-brief",
+    name: "광고 소재 기획",
+    description:
+      "광고주·매체·타깃·캠페인 목적을 입력하면 헤드라인·바디카피·콘셉트 방향 초안을 자동 생성합니다.",
+    href: "/creative-brief",
+    category: "광고",
+    tags: ["소재기획", "헤드라인", "바디카피", "콘셉트", "비주얼", "AI"],
+    status: "available",
+    icon: Lightbulb,
+  },
+  {
     id: "ad-keyword-recommend",
     name: "광고 키워드 추천",
     description:
@@ -121,6 +169,35 @@ export const AGENTS: Agent[] = [
 export const CATEGORIES: string[] = Array.from(
   new Set(AGENTS.map((a) => a.category))
 );
+
+/** 헤더 네비게이션 그룹 */
+export interface NavGroup {
+  /** 드롭다운 트리거에 표시할 카테고리명 */
+  category: string;
+  items: Agent[];
+}
+
+/**
+ * 헤더 드롭다운용 그룹 목록.
+ *
+ * 실제로 열 수 있는 에이전트(status: "available" 이면서 href 가 실제 경로)만
+ * AGENTS 등장 순서를 유지하며 카테고리로 묶는다.
+ *
+ * → 새 기능은 AGENTS 에 항목 하나만 추가하면 헤더에 자동으로 나타난다.
+ *   (header.tsx 를 손댈 필요가 없다)
+ */
+export const NAV_GROUPS: NavGroup[] = (() => {
+  const grouped = new Map<string, Agent[]>();
+
+  for (const agent of AGENTS) {
+    if (agent.status !== "available" || agent.href === "#") continue;
+    const items = grouped.get(agent.category);
+    if (items) items.push(agent);
+    else grouped.set(agent.category, [agent]);
+  }
+
+  return Array.from(grouped, ([category, items]) => ({ category, items }));
+})();
 
 /** id로 에이전트 이름 조회 (포인트 사용 내역 표시용) */
 export function agentName(id: AgentId): string {

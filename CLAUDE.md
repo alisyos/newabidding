@@ -40,6 +40,7 @@ npm run lint
 - **알림**: React Toastify
 - **날짜 처리**: date-fns
 - **스타일링 유틸리티**: clsx, tailwind-merge, class-variance-authority
+- **웹 크롤링**: puppeteer-core + @sparticuz/chromium (댓글 수집 기능 전용, 서버 전용)
 
 ### 레이아웃 구조
 - **헤더 전용 레이아웃**: 사이드바 없이 중앙 정렬된 네비게이션을 가진 간단한 헤더
@@ -62,14 +63,51 @@ npm run lint
 ```
 src/
 ├── app/                    # Next.js App Router 페이지들
+│   └── api/               # API 라우트
 ├── components/
 │   ├── ui/                # Radix UI 기반 커스텀 컴포넌트
-│   └── layout/            # 레이아웃 컴포넌트 (header)
-├── lib/                   # 유틸리티 (cn 함수가 있는 utils.ts)
-├── store/                 # Zustand 스토어 (전역 상태 필요시)
+│   ├── common/            # 기능 간 공용 컴포넌트 (폼 필드, 페이지네이션 등)
+│   ├── layout/            # 레이아웃 컴포넌트 (header, header-nav)
+│   └── <기능명>/          # 기능별 컴포넌트
+├── lib/                   # 유틸리티 · 순수 헬퍼 · 서버 전용 스크래퍼
+├── store/                 # Zustand 스토어 (points.ts)
 ├── types/                 # TypeScript 타입 정의
 └── hooks/                 # 커스텀 훅
 ```
+
+### 페이지 구성 규칙
+- `src/app/<기능>/page.tsx` 는 **서버 컴포넌트**로, `*-view.tsx` 만 렌더합니다.
+- 상태·API 호출·포인트 차감은 모두 `src/components/<기능>/<기능>-view.tsx`(`"use client"`)에 둡니다.
+- 화면 셸은 `min-h-[calc(100vh-65px)] bg-muted/20` → `container` → 번호가 붙은 `Card` 섹션 구조를 따릅니다.
+- 폼 검증은 `validateXxx(): Record<string, string>` 형태의 인라인 오류 맵을 씁니다.
+  (클라이언트에서는 React Hook Form 을 쓰지 않습니다. Zod 는 API 라우트에서만 사용)
+
+### 새 에이전트(기능) 추가 절차
+새 기능 페이지를 추가할 때는 아래 순서를 지켜야 합니다. 타입이 누락을 강제로 잡아줍니다.
+
+1. `src/types/agent.ts` → `AGENT_IDS` 에 id 추가
+2. `src/lib/point-pricing.ts` → `PRICING_META` 에 단가 추가
+   (`Record<AgentId, _>` 이므로 빠뜨리면 빌드가 실패합니다)
+3. `src/lib/agents.ts` → `AGENTS` 에 카드 항목 추가
+4. 페이지·컴포넌트 구현
+
+홈 화면 카드/카테고리 칩, 헤더 네비게이션(`NAV_GROUPS`), 관리자 단가표는 모두
+`AGENTS` 에서 파생되므로 **따로 수정할 필요가 없습니다.**
+
+### 크롤링 기능 (blog-comments / instagram-comments)
+- Puppeteer(`puppeteer-core` + `@sparticuz/chromium`)로 실제 크롤링합니다.
+- **로컬 실행에는 Chrome 이 필요합니다.** `.env.local` 에 `CHROME_PATH` 를 지정하세요.
+- 서버는 NDJSON 스트리밍으로 응답하고, 클라이언트는 `useNdjsonCollection` 훅으로 받습니다.
+- 포인트는 스트림이 끝나는 시점(`onSettle`)에서 **한 번만** 차감하며,
+  실패·중단·0건 수집에는 차감하지 않습니다.
+- `src/lib/puppeteer.ts` 의 `getBrowser()` 는 프로덕션에서
+  `chromium.executablePath()` → `registerKoreanFonts()` **순서를 반드시 지켜야 합니다.**
+  (순서를 바꾸면 한글이 전부 공백으로 렌더됩니다)
+
+### blog_event 폴더
+이식 원본이 된 별도 프로젝트입니다. `tsconfig.json` 의 `exclude` 와
+`.eslintrc.json` 의 `ignorePatterns` 로 빌드에서 제외되어 있으니 **그대로 두세요.**
+제외를 풀면 호스트 빌드가 깨집니다.
 
 ## 중요한 가이드라인
 
