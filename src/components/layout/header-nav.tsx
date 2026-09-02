@@ -78,6 +78,19 @@ export function HeaderNav() {
           </DropdownMenu>
         );
       })}
+
+      {/* 크롤링 개발 의뢰 — AGENTS 파생이 아닌 영업용 랜딩페이지라 별도 링크로 둔다.
+          (포인트 차감이 없어 AGENT_IDS / AGENTS 에 등록하지 않는다)
+          좁은 화면에서는 카테고리 메뉴와 함께 가로가 넘치므로 lg 이상에서만 노출한다. */}
+      <Link
+        href="/crawling-service"
+        className={cn(
+          linkClass(pathname === "/crawling-service"),
+          "hidden lg:inline"
+        )}
+      >
+        크롤링 개발 의뢰
+      </Link>
     </nav>
   );
 }
