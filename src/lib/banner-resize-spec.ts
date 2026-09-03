@@ -158,6 +158,36 @@ export const GEMINI_ASPECT_RATIOS: { value: string; ratio: number }[] = [
   { value: "8:1", ratio: 8 },
 ];
 
+/**
+ * OpenAI 이미지 모델이 항상 받아주는 표준 사이즈.
+ *
+ * 평소에는 쓰지 않는다 — gpt-image-2 는 임의 WIDTHxHEIGHT 를 받으므로 그쪽이 크롭이 적다.
+ * 이 목록은 모델이 요청한 캔버스 크기를 거부했을 때(400) 되돌아갈 마지막 안전지대다.
+ * (banner-image-models.ts 의 폴백 체인에서만 쓴다)
+ */
+export const GPT_STANDARD_SIZES: { width: number; height: number; ratio: number }[] = [
+  { width: 1024, height: 1536, ratio: 1024 / 1536 },
+  { width: 1024, height: 1024, ratio: 1 },
+  { width: 1536, height: 1024, ratio: 1536 / 1024 },
+];
+
+/** 목표 비율에 가장 가까운 표준 사이즈 (nearestGeminiAspect 와 같은 로그 거리 기준) */
+export function nearestGptStandardSize(ratio: number): {
+  width: number;
+  height: number;
+} {
+  let best = GPT_STANDARD_SIZES[1];
+  let bestDist = Infinity;
+  for (const s of GPT_STANDARD_SIZES) {
+    const d = Math.abs(Math.log(ratio) - Math.log(s.ratio));
+    if (d < bestDist) {
+      bestDist = d;
+      best = s;
+    }
+  }
+  return { width: best.width, height: best.height };
+}
+
 const round16 = (n: number) => Math.max(256, Math.round(n / 16) * 16);
 const clamp = (n: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, n));

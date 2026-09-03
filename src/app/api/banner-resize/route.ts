@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
+  describeUpstreamError,
   generateBanner,
   resolveModelId,
   toKoreanError,
@@ -22,6 +23,7 @@ import {
   MAX_SIZES,
   MAX_SOURCE_TEXT_CHARS,
   SIZE_RANGE,
+  planGeneration,
 } from "@/lib/banner-resize-spec";
 import type { BannerModelKey } from "@/types/banner-resize";
 
@@ -120,6 +122,15 @@ export async function POST(req: Request) {
 
   const modelId = resolveModelId(input.model);
 
+  // 생성 기하는 클라이언트가 계산해 보내지만 그대로 믿지 않는다.
+  // gpt-image-2 는 16 배수·종횡비 1:3~3:1 을 어기면 400 을 내므로 서버에서 다시 계산한다.
+  // 밴드 좌표까지 서버 값으로 덮어써도 안전하다 — 최종 크롭은 클라이언트 renderFinal() 의
+  // locateBand() 가 "실제로 생성된 이미지" 를 기준으로 다시 잡기 때문이다.
+  const plan =
+    input.model === "gpt-image-2"
+      ? planGeneration(input.model, input.size)
+      : input.plan;
+
   try {
     const generated = await generateBanner({
       model: input.model,
@@ -128,11 +139,11 @@ export async function POST(req: Request) {
       sourceDataUrl: input.sourceDataUrl,
       prompt: buildResizePrompt(
         input.size,
-        input.plan,
+        plan,
         input.options,
         input.sourceMeta
       ),
-      plan: input.plan,
+      plan,
     });
 
     return NextResponse.json({
@@ -141,6 +152,12 @@ export async function POST(req: Request) {
       notes: generated.notes,
     });
   } catch (e) {
+    // 사용자 화면 문구는 사유를 다 담지 못한다. 공급사 원문은 반드시 서버 로그에 남긴다.
+    console.error(
+      "[banner-resize]",
+      `${modelId} ${input.size.id}`,
+      describeUpstreamError(e)
+    );
     // 실패 시 클라이언트가 포인트를 차감하지 않도록 항상 error 응답으로 내려보낸다
     return NextResponse.json({ error: toKoreanError(e, modelId) }, { status: 502 });
   }

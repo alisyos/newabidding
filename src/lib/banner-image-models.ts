@@ -10,6 +10,7 @@
 
 import OpenAI, { toFile } from "openai";
 
+import { nearestGptStandardSize } from "@/lib/banner-resize-spec";
 import type {
   BannerGenerationPlan,
   BannerModelKey,
@@ -46,9 +47,110 @@ export function decodeDataUrl(dataUrl: string): {
 
 // ------------------------------------------------------------------ GPT-Image-2
 
+/** 모델 1회 호출에 실제로 보내는 파라미터 (선택 항목은 폴백에서 하나씩 걷어낸다) */
+interface GptEditParams {
+  model: string;
+  prompt: string;
+  n: number;
+  size?: string;
+  input_fidelity?: "high";
+  background?: "opaque";
+  output_format?: "png";
+}
+
+/** 폴백 재시도 상한 — 한 규격에 20~60초가 걸리므로 무한정 늘릴 수 없다 */
+const MAX_GPT_ATTEMPTS = 3;
+
+/**
+ * gpt-image-2 계열인지.
+ *
+ * input_fidelity 는 gpt-image-1 / gpt-image-1.5 전용이고 gpt-image-2 는 아예 거부한다.
+ *   400 {"code":"invalid_input_fidelity_model",
+ *        "message":"The model 'gpt-image-2' does not support the 'input_fidelity' parameter."}
+ * OPENAI_IMAGE_MODEL 로 구형 모델을 지정할 수도 있으므로 모델명으로 갈라 준다.
+ * (구형 모델에서는 원본 보존력이 눈에 띄게 좋아지는 옵션이라 무조건 빼지 않는다)
+ */
+function isGptImage2(model: string): boolean {
+  return /^gpt-image-2/.test(model);
+}
+
+/** 확장자와 Content-Type 이 어긋나면 업로드 자체가 400 이 될 수 있다 */
+function fileNameFor(mimeType: string): string {
+  if (mimeType === "image/png") return "source.png";
+  if (mimeType === "image/webp") return "source.webp";
+  return "source.jpg";
+}
+
+/** OpenAI.APIError 는 네임스페이스 안의 "값"이라 타입으로는 이렇게 꺼내야 한다 */
+type OpenAiApiError = InstanceType<typeof OpenAI.APIError>;
+
+/** 400 응답이 지목한 파라미터 이름이 맞는지 (param 필드가 비어 있는 응답도 있어 message 도 본다) */
+function blamesParam(e: OpenAiApiError, name: string): boolean {
+  if (e.param === name) return true;
+  return new RegExp(`\\b${name}\\b`).test(e.message ?? "");
+}
+
+/**
+ * 400 을 낸 파라미터를 하나 걷어내고, 사용자에게 보여줄 안내 문구를 돌려준다.
+ * 더 낮출 게 없으면 null (= 재시도 포기).
+ *
+ * 모델·계정마다 받아주는 파라미터가 다르고 공급사가 예고 없이 바꾸기도 한다.
+ * 여기서 스스로 낮춰 재시도하지 않으면 그때마다 기능 전체가 멈춘다.
+ */
+function degradeGptParams(
+  params: GptEditParams,
+  e: OpenAiApiError,
+  dropped: Set<string>
+): string | null {
+  for (const name of ["input_fidelity", "background", "output_format"] as const) {
+    if (params[name] !== undefined && !dropped.has(name) && blamesParam(e, name)) {
+      delete params[name];
+      dropped.add(name);
+      return `OpenAI가 ${name} 옵션을 거부해 이 옵션 없이 다시 생성했습니다.`;
+    }
+  }
+
+  if (params.size !== undefined && blamesParam(e, "size")) {
+    if (!dropped.has("size")) {
+      // 임의 해상도가 막힌 계정·모델을 위한 안전지대.
+      // 표준 사이즈는 최대 1.5:1 이라 극단적인 배너 비율에서는 크롭이 커진다.
+      const [w, h] = params.size.split("x").map(Number);
+      const std = nearestGptStandardSize(w / h);
+      dropped.add("size");
+      params.size = `${std.width}x${std.height}`;
+      return `OpenAI가 ${w}×${h} 캔버스를 거부해 ${std.width}×${std.height}로 생성한 뒤 잘라냈습니다. 크롭이 커질 수 있습니다.`;
+    }
+    delete params.size;
+    return "OpenAI가 지정한 캔버스 크기를 모두 거부해 모델 기본 크기로 생성한 뒤 잘라냈습니다.";
+  }
+
+  // 요청의 뼈대를 지목한 400 은 옵션을 걷어내도 절대 풀리지 않는다.
+  // (모델명 오류, 이미지 파일 거부, 프롬프트 문제 등) 헛호출로 20초를 더 쓰지 않는다.
+  if (e.param && ["model", "image", "prompt"].includes(e.param)) return null;
+
+  // 어느 파라미터가 문제인지 응답만으로는 알 수 없는 400.
+  // 선택 항목을 한꺼번에 걷어낸 최소 요청으로 딱 한 번 더 시도한다.
+  const hasOptional =
+    params.input_fidelity !== undefined ||
+    params.background !== undefined ||
+    params.output_format !== undefined;
+  if (!hasOptional) return null;
+
+  delete params.input_fidelity;
+  delete params.background;
+  delete params.output_format;
+  dropped.add("input_fidelity");
+  dropped.add("background");
+  dropped.add("output_format");
+  return "OpenAI가 요청을 거부해 최소 옵션으로 다시 생성했습니다.";
+}
+
 /**
  * 원본을 참조로 주고 새 캔버스 크기로 다시 디자인하게 한다.
  * 마스크는 쓰지 않는다 — 특정 영역을 잠그면 레이아웃 재배치가 불가능해진다.
+ *
+ * 400 이 나면 거부된 파라미터를 낮춰 최대 MAX_GPT_ATTEMPTS 회까지 재시도한다.
+ * 400 이 아닌 실패(401/403/404/429/타임아웃)는 재시도해도 결과가 같으므로 즉시 던진다.
  */
 async function callGptImage(
   apiKey: string,
@@ -60,26 +162,52 @@ async function callGptImage(
   const client = new OpenAI({ apiKey, timeout: CALL_TIMEOUT_MS, maxRetries: 1 });
   const source = decodeDataUrl(sourceDataUrl);
 
-  const image = await toFile(source.buffer, "source.jpg", {
+  const image = await toFile(source.buffer, fileNameFor(source.mimeType), {
     type: source.mimeType,
   });
 
-  const res = await client.images.edit({
+  const params: GptEditParams = {
     model,
-    image,
     prompt,
+    n: 1,
     size: `${plan.genWidth}x${plan.genHeight}`,
-    // 배치는 자유롭게 바꾸되 상품·인물의 "외형"은 원본을 따라가게 한다
-    input_fidelity: "high",
     // gpt-image-2 는 transparent 를 거부한다 (opaque/auto 만 허용)
     background: "opaque",
     output_format: "png",
-    n: 1,
-  });
+  };
+  // 배치는 자유롭게 바꾸되 상품·인물의 "외형"은 원본을 따라가게 한다.
+  // gpt-image-2 는 이 옵션 자체를 지원하지 않으므로 구형 모델에서만 붙인다.
+  if (!isGptImage2(model)) params.input_fidelity = "high";
 
-  const b64 = res.data?.[0]?.b64_json;
-  if (!b64) throw new Error("모델이 이미지를 반환하지 않았습니다.");
-  return { dataUrl: `data:image/png;base64,${b64}`, notes: [] };
+  const notes: string[] = [];
+  const dropped = new Set<string>();
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_GPT_ATTEMPTS; attempt += 1) {
+    try {
+      const res = await client.images.edit({ ...params, image });
+      const b64 = res.data?.[0]?.b64_json;
+      if (!b64) throw new Error("모델이 이미지를 반환하지 않았습니다.");
+      // output_format 을 폴백으로 떼어냈을 수 있다. 그때 모델 기본값은 png 다.
+      const mime = `image/${params.output_format ?? "png"}`;
+      return { dataUrl: `data:${mime};base64,${b64}`, notes };
+    } catch (e) {
+      lastError = e;
+      if (!(e instanceof OpenAI.APIError) || e.status !== 400) throw e;
+      if (attempt === MAX_GPT_ATTEMPTS) break;
+
+      const note = degradeGptParams(params, e, dropped);
+      if (!note) break;
+      console.warn(
+        "[banner-resize] gpt 재시도:",
+        note,
+        describeUpstreamError(e)
+      );
+      notes.push(note);
+    }
+  }
+
+  throw lastError;
 }
 
 // ------------------------------------------------------------- Nano Banana 2
@@ -229,6 +357,33 @@ export function generateBanner(args: {
 
 // -------------------------------------------------------------------- 에러 매핑
 
+/**
+ * 서버 로그용 한 줄 요약.
+ *
+ * 사용자 화면 문구는 사유를 뭉뚱그릴 수밖에 없으므로, 공급사가 실제로 뭐라고 했는지는
+ * 반드시 로그에 남겨야 한다. (이게 없어서 "input_fidelity 미지원" 400 을
+ * "부적절한 내용" 으로 오진한 채 방치된 적이 있다)
+ * API 키·Authorization 헤더는 절대 포함하지 않는다.
+ */
+export function describeUpstreamError(e: unknown): string {
+  if (e instanceof GeminiApiError) {
+    return `Gemini status=${e.status} code=${e.code} message=${e.message}`;
+  }
+  if (e instanceof OpenAI.APIError) {
+    return [
+      "OpenAI",
+      `status=${e.status ?? "-"}`,
+      `type=${e.type ?? "-"}`,
+      `code=${e.code ?? "-"}`,
+      `param=${e.param ?? "-"}`,
+      `request_id=${e.requestID ?? "-"}`,
+      `message=${e.message}`,
+    ].join(" ");
+  }
+  if (e instanceof Error) return `${e.name}: ${e.message}`;
+  return String(e);
+}
+
 /** 예외 → 사용자에게 보여줄 한국어 메시지. API 키·헤더는 절대 노출하지 않는다. */
 export function toKoreanError(
   e: unknown,
@@ -296,6 +451,14 @@ export function toKoreanError(
         message: "OpenAI API 키가 올바르지 않습니다.",
       };
     }
+    if (e.status === 403) {
+      // 이미지 모델은 조직 인증(Verify Organization)을 요구하는 경우가 있다.
+      // 키가 유효해도 여기서 막히므로 401 과 안내를 구분한다.
+      return {
+        code: "INVALID_API_KEY",
+        message: `OpenAI 계정에 모델("${modelId}") 사용 권한이 없습니다. 조직 인증(Verify Organization) 상태와 프로젝트 권한을 확인해주세요.`,
+      };
+    }
     if (e.status === 429) {
       // Gemini 쪽과 같은 이유로 "크레딧 소진"과 "분당 한도 초과"를 나눈다
       if (e.code === "insufficient_quota") {
@@ -317,18 +480,34 @@ export function toKoreanError(
       };
     }
     if (e.status === 400) {
-      if (e.code === "unsupported_parameter" || e.code === "unsupported_value") {
+      // [주의] 400 을 통째로 "부적절한 내용" 으로 뭉개면 안 된다.
+      // 실제로는 파라미터 거부가 훨씬 흔한데, 그걸 모더레이션으로 오진하면
+      // 사용자가 멀쩡한 원본 이미지만 계속 바꿔 보게 된다. 안전 필터일 때만 그 문구를 쓴다.
+      if (
+        e.code === "moderation_blocked" ||
+        /safety|moderation/i.test(e.message ?? "")
+      ) {
         return {
           code: "UPSTREAM_ERROR",
-          message: `현재 모델(${modelId})이 지원하지 않는 값입니다${
-            e.param ? `: ${e.param}` : ""
-          }. OPENAI_IMAGE_MODEL 설정을 확인해주세요.`,
+          message:
+            "OpenAI 안전 필터가 요청을 거부했습니다. 원본 이미지나 문구에 정책상 허용되지 않는 내용이 없는지 확인해주세요.",
         };
       }
+
+      const detail = [
+        e.code ? `코드: ${e.code}` : "",
+        e.param ? `항목: ${e.param}` : "",
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      // 폴백 재시도를 모두 소진한 뒤에만 여기까지 온다.
+      // 그러므로 사유를 감추지 말고 공급사 원문을 그대로 붙여 준다.
       return {
         code: "UPSTREAM_ERROR",
-        message:
-          "요청이 OpenAI에서 거부되었습니다. 원본 이미지에 부적절한 내용이 없는지 확인해주세요.",
+        message: `요청이 OpenAI에서 거부되었습니다${
+          detail ? ` (${detail})` : ""
+        }. ${e.message}`,
       };
     }
     return {
