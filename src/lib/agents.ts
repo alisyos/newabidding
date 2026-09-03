@@ -8,6 +8,7 @@ import {
   MessageSquare,
   MessageSquareQuote,
   PenLine,
+  Scaling,
   Search,
   Sparkles,
   TrendingUp,
@@ -140,6 +141,17 @@ export const AGENTS: Agent[] = [
     tags: ["소재기획", "헤드라인", "바디카피", "콘셉트", "비주얼", "AI"],
     status: "available",
     icon: Lightbulb,
+  },
+  {
+    id: "banner-resize",
+    name: "AI 배너 리사이징",
+    description:
+      "원본 배너 1장으로 매체별 광고 규격을 AI가 자동 재구성해 한 번에 생성합니다.",
+    href: "/banner-resize",
+    category: "이미지",
+    tags: ["배너", "리사이징", "이미지생성", "아웃페인팅", "GPT-Image", "Nano Banana"],
+    status: "available",
+    icon: Scaling,
   },
   {
     id: "ad-keyword-recommend",

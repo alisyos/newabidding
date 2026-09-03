@@ -17,6 +17,7 @@ export const AGENT_IDS = [
   "competitor-monitoring",
   "ad-copy-generator",
   "creative-brief",
+  "banner-resize",
   "ad-keyword-recommend",
   "category-trend",
 ] as const;

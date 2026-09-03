@@ -4,7 +4,7 @@ import type { AgentId } from "@/types/agent";
 import type { UserId } from "@/types/user";
 
 /** 단가가 적용되는 단위 — 표시 라벨과 계산 기준을 함께 결정한다 */
-export type PriceUnit = "keyword" | "adCopy" | "run";
+export type PriceUnit = "keyword" | "adCopy" | "run" | "image";
 
 /** 에이전트별 차감 단가 맵 (localStorage 저장 대상) */
 export type AgentPriceMap = Record<AgentId, number>;

@@ -12,6 +12,7 @@ export const UNIT_LABEL: Record<PriceUnit, string> = {
   keyword: "키워드 1건당",
   adCopy: "문구 1건당",
   run: "실행 1회당",
+  image: "이미지 1건당",
 };
 
 interface PricingMeta {
@@ -32,6 +33,7 @@ export const PRICING_META: Record<AgentId, PricingMeta> = {
   "youtube-monitoring": { unit: "run", defaultPrice: 100 },
   "ad-copy-generator": { unit: "adCopy", defaultPrice: 5 },
   "creative-brief": { unit: "run", defaultPrice: 300 },
+  "banner-resize": { unit: "image", defaultPrice: 150 },
   "rank-tracking": { unit: "run", defaultPrice: 100 },
   "product-name-optimizer": { unit: "run", defaultPrice: 50 },
   "review-analysis": { unit: "run", defaultPrice: 200 },

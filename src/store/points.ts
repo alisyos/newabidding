@@ -280,3 +280,8 @@ export function costForAdCopy(
     0
   );
 }
+
+/** 생성 성공한 이미지 개수 → 필요 포인트 (이미지 1건당 과금) */
+export function costForImages(count: number, unitPrice: number): number {
+  return count * unitPrice;
+}
