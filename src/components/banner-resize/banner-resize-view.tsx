@@ -199,6 +199,7 @@ export function BannerResizeView() {
           generatedWidth: rendered.generatedWidth,
           generatedHeight: rendered.generatedHeight,
           bandShifted: rendered.bandShifted,
+          contentClipped: rendered.contentClipped,
           notes: Array.isArray(json.notes) ? json.notes : [],
         }),
       };

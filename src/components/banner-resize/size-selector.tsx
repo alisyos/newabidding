@@ -215,7 +215,11 @@ export function SizeSelector({
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {value.map((size) => (
+            {value.map((size) => {
+              // 프리셋 그리드에만 배지를 달면 직접 입력한 규격의 손실률을 놓친다.
+              // 선택 목록은 프리셋·커스텀이 모두 모이는 유일한 자리다.
+              const loss = estimateCropLoss(model, size);
+              return (
               <span
                 key={size.id}
                 className="flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs"
@@ -226,6 +230,14 @@ export function SizeSelector({
                 <span className="text-muted-foreground">
                   {formatRatio(size.width, size.height)}
                 </span>
+                {loss >= CROP_BADGE_THRESHOLD && (
+                  <span
+                    className="rounded-full border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                    title={`이 모델은 ${size.width}×${size.height} 비율을 직접 만들지 못해 생성 후 ${loss}%를 잘라냅니다`}
+                  >
+                    크롭 {loss}%
+                  </span>
+                )}
                 <button
                   type="button"
                   disabled={disabled}
@@ -236,7 +248,8 @@ export function SizeSelector({
                   <X className="h-3 w-3" />
                 </button>
               </span>
-            ))}
+              );
+            })}
           </div>
         )}
 

@@ -39,8 +39,14 @@ function ratioText(width: number, height: number): string {
  * 한 규격 1회 호출용 프롬프트.
  *
  * plan.cropped 가 true 면 최종 결과는 캔버스 중앙 밴드만 잘라 쓴다.
- * 모델이 캔버스 전체에 구성을 펼치므로, 세이프 에어리어를 반드시 알려야
- * 핵심 요소가 잘려 나가지 않는다.
+ * 이때 프롬프트는 "캔버스(모델이 그리는 그림)" 와 "아트보드(실제로 납품되는 광고)" 를
+ * 반드시 구분해야 한다.
+ *
+ * [이전 실패] 세이프 에어리어를 알려주면서도 다른 줄에서
+ *   "Fill the entire canvas edge to edge" / "Deliver one {genW}x{genH} banner"
+ * 라고 지시했다. 모델 입장에서는 정반대 요구가 동시에 들어온 셈이고,
+ * 결국 캔버스 전체를 광고로 채운 뒤 우리가 그 25% 를 잘라내 로고·문구가 날아갔다.
+ * 그래서 크롭이 있는 경우에는 "채워야 할 면" 을 전부 아트보드로 바꿔 말한다.
  */
 export function buildResizePrompt(
   size: BannerSize,
@@ -50,6 +56,25 @@ export function buildResizePrompt(
 ): string {
   const lines: string[] = [];
 
+  // 잘려나가는 여백(bleed) 계산 — 크롭이 없으면 전부 0 이다
+  const cutTop = plan.bandY;
+  const cutBottom = plan.genHeight - (plan.bandY + plan.bandHeight);
+  const cutLeft = plan.bandX;
+  const cutRight = plan.genWidth - (plan.bandX + plan.bandWidth);
+  const vertical = cutTop + cutBottom > cutLeft + cutRight;
+
+  // 픽셀 좌표보다 "위 N%" 같은 비율 표현을 훨씬 잘 따르지만,
+  // 픽셀도 함께 주면 경계가 모호해지지 않는다. 둘 다 준다.
+  const pctTop = Math.round((cutTop / plan.genHeight) * 100);
+  const pctBottom = Math.round((cutBottom / plan.genHeight) * 100);
+  const pctLeft = Math.round((cutLeft / plan.genWidth) * 100);
+  const pctRight = Math.round((cutRight / plan.genWidth) * 100);
+
+  const cropped = plan.cropped;
+  /** 광고로 채워야 하는 면 — 크롭이 있으면 캔버스가 아니라 아트보드다 */
+  const surface = cropped ? "artboard" : "canvas";
+  const artboard = `${plan.bandWidth}x${plan.bandHeight}`;
+
   lines.push(
     "You are an art director adapting an existing advertising banner to a new ad slot.",
     "",
@@ -58,13 +83,28 @@ export function buildResizePrompt(
     "The two shapes are different, so a full REDESIGN is required. Do not simply pad, letterbox, stretch or centre the original with filler on the sides — that is a failed result."
   );
 
+  // 출력물이 어떻게 쓰이는지를 레이아웃 지시보다 "먼저" 알려준다.
+  // 중반부에 두면 앞선 지시에 묻혀 캔버스 전체를 광고로 채워 버린다.
+  if (cropped) {
+    lines.push(
+      "",
+      "HOW YOUR OUTPUT IS USED — READ THIS BEFORE YOU DESIGN ANYTHING:",
+      `You will paint a ${plan.genWidth}x${plan.genHeight} image, but only its central ${artboard} strip is delivered to the client.`,
+      vertical
+        ? `The top ${cutTop}px (${pctTop}%) and the bottom ${cutBottom}px (${pctBottom}%) of that image are BLEED: they are trimmed off and thrown away.`
+        : `The left ${cutLeft}px (${pctLeft}%) and the right ${cutRight}px (${pctRight}%) of that image are BLEED: they are trimmed off and thrown away.`,
+      `So the ARTBOARD — the advertisement itself — is that central ${artboard} strip (${ratioText(plan.bandWidth, plan.bandHeight)}). It has to work as a complete ${size.width}x${size.height} banner entirely on its own.`,
+      "Design the advert to fill the artboard exactly, and let ONLY the background continue outward into the bleed."
+    );
+  }
+
   lines.push(
     "",
-    "REBUILD THE LAYOUT:",
+    cropped ? "REBUILD THE LAYOUT INSIDE THE ARTBOARD:" : "REBUILD THE LAYOUT:",
     "- Move, resize and regroup every element — product, headline, body copy, logo, call-to-action — so the banner reads naturally at the new shape.",
     "- For a wide, short slot: put the key visual on one side and stack the copy beside it in a horizontal reading order.",
     "- For a tall, narrow slot: stack the elements vertically with clear hierarchy.",
-    "- Fill the entire canvas edge to edge. No empty side panels, no borders, no frame, no letterboxing.",
+    `- Fill the entire ${cropped ? "ARTBOARD" : "canvas"} edge to edge. No empty side panels, no borders, no frame, no letterboxing.`,
     `- ${COMPOSITION_HINT[options.composition] ?? COMPOSITION_HINT.auto}`
   );
 
@@ -83,7 +123,7 @@ export function buildResizePrompt(
   }
   if (options.expandBackground) {
     keep.push(
-      "Rebuild the background for the new shape: extend gradients, surfaces, lighting and scenery so it fills the canvas convincingly."
+      "Rebuild the background for the new shape: extend gradients, surfaces, lighting and scenery so it fills the whole image convincingly, bleed included."
     );
   } else {
     keep.push(
@@ -99,7 +139,7 @@ export function buildResizePrompt(
   if (options.preserveText) {
     lines.push(
       "- Reproduce every piece of text with EXACTLY the same wording and spelling as the reference, character for character.",
-      "- You MAY move it, resize it, change its line breaks and re-align it to suit the new layout.",
+      `- You MAY move it, resize it, change its line breaks and re-align it to suit the new ${surface}.`,
       "- You MUST NOT translate, paraphrase, rewrite, correct, shorten or extend any text, and you must not invent text that is not in the reference.",
       "- Every glyph must be crisp and correctly formed. Garbled or misspelled lettering makes the banner unusable."
     );
@@ -120,40 +160,29 @@ export function buildResizePrompt(
     );
   }
 
-  if (plan.cropped) {
-    const cutTop = plan.bandY;
-    const cutBottom = plan.genHeight - (plan.bandY + plan.bandHeight);
-    const cutLeft = plan.bandX;
-    const cutRight = plan.genWidth - (plan.bandX + plan.bandWidth);
-    const vertical = cutTop + cutBottom > cutLeft + cutRight;
-
-    // 픽셀 좌표보다 "위 N% / 아래 N%" 같은 비율 표현을 훨씬 잘 따른다.
-    const pctTop = Math.round((cutTop / plan.genHeight) * 100);
-    const pctBottom = Math.round((cutBottom / plan.genHeight) * 100);
-    const pctLeft = Math.round((cutLeft / plan.genWidth) * 100);
-    const pctRight = Math.round((cutRight / plan.genWidth) * 100);
-
+  if (cropped) {
     lines.push(
       "",
-      "SAFE AREA — THE MOST COMMON WAY THIS GOES WRONG:",
-      `The finished banner is ${size.width}x${size.height}, but you are painting a ${vertical ? "taller" : "wider"} canvas on purpose. The outer edges are trimmed off before delivery.`,
+      "BLEED RULES — THE MOST COMMON WAY THIS GOES WRONG:",
       vertical
-        ? `The top ${pctTop}% and the bottom ${pctBottom}% of this canvas WILL BE CUT AWAY. Only the middle ${100 - pctTop - pctBottom}% survives.`
-        : `The left ${pctLeft}% and the right ${pctRight}% of this canvas WILL BE CUT AWAY. Only the middle ${100 - pctLeft - pctRight}% survives.`,
-      `Therefore: every logo, every word, the product and any face must sit entirely within that middle ${vertical ? "horizontal" : "vertical"} band, with a little breathing room from its edges.`,
-      `The trimmed ${vertical ? "top and bottom" : "left and right"} margins must contain ONLY plain continued background — no logo, no text, no product, no faces, nothing you would miss.`,
-      `Compose the advert as if the middle band were the whole artboard, then let the background bleed outward into the margins.`
+        ? `The top ${cutTop}px and the bottom ${cutBottom}px of the image are bleed. Put NOTHING there but plain, continued background.`
+        : `The left ${cutLeft}px and the right ${cutRight}px of the image are bleed. Put NOTHING there but plain, continued background.`,
+      "No logo, no wordmark, no headline, no body copy, no button, no product and no face may sit in the bleed or cross its edge.",
+      `Every one of those elements must sit entirely inside the central ${artboard} artboard, with a little breathing room from the artboard's ${vertical ? "top and bottom" : "left and right"} edges.`,
+      "If something does not fit inside the artboard, scale it down or re-arrange the composition — never let it run out into the bleed."
     );
   }
 
   lines.push(
     "",
-    `Deliver one finished, production-ready ${plan.genWidth}x${plan.genHeight} advertising banner.`
+    cropped
+      ? `Deliver one ${plan.genWidth}x${plan.genHeight} image whose central ${artboard} strip is a finished, production-ready ${size.width}x${size.height} advertisement, with nothing but background in the outer ${vertical ? "top and bottom" : "left and right"} margins.`
+      : `Deliver one finished, production-ready ${plan.genWidth}x${plan.genHeight} advertising banner.`
   );
-  if (plan.cropped) {
-    // 마지막 지시에 가중치가 실리므로 세이프 에어리어를 한 번 더 못박는다
+  if (cropped) {
+    // 마지막 지시에 가중치가 실리므로 아트보드 규칙을 한 번 더 못박는다
     lines.push(
-      "Remember: keep the logo, all copy and the product inside the central band — the outer margins get trimmed."
+      "Remember: the advertisement lives entirely inside the central artboard. The outer margins are background only and get trimmed away."
     );
   }
 
