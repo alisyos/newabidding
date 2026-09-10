@@ -19,7 +19,14 @@ import { BannerUpload } from "@/components/banner-resize/banner-upload";
 import { ModelSelectCards } from "@/components/banner-resize/model-select-cards";
 import { RunSummaryDialog } from "@/components/banner-resize/run-summary-dialog";
 import { SizeSelector } from "@/components/banner-resize/size-selector";
-import { buildModelInput, buildWarnings, renderFinal } from "@/lib/banner-canvas";
+import {
+  OUTPUT_FORMATS,
+  buildModelInput,
+  buildWarnings,
+  encodeForDownload,
+  estimateDataUrlBytes,
+  renderFinal,
+} from "@/lib/banner-canvas";
 import {
   BANNER_MODELS,
   DEFAULT_MODEL,
@@ -40,6 +47,7 @@ import {
 } from "@/store/points";
 import type {
   BannerModelKey,
+  BannerOutputFormat,
   BannerResizeOptions,
   BannerResultItem,
   BannerSize,
@@ -108,6 +116,8 @@ export function BannerResizeView() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [compareItem, setCompareItem] = useState<BannerResultItem | null>(null);
+  /** 다운로드 포맷 — 기본값은 지금까지와 같은 PNG 로 둔다 */
+  const [outFormat, setOutFormat] = useState<BannerOutputFormat>("png");
 
   const balance = useCurrentBalance();
   const currentUserId = useCurrentUserId();
@@ -119,6 +129,12 @@ export function BannerResizeView() {
     () => costForImages(sizes.length, unitPrice),
     [sizes.length, unitPrice]
   );
+
+  /** 용량 안내용 — 완료된 첫 결과의 PNG 실측 바이트 (규격마다 다르지만 감을 주는 용도) */
+  const firstDonePngBytes = useMemo(() => {
+    const first = results.find((r) => r.status === "done" && r.imageDataUrl);
+    return first?.imageDataUrl ? estimateDataUrlBytes(first.imageDataUrl) : undefined;
+  }, [results]);
 
   const patchOptions = (patch: Partial<BannerResizeOptions>) => {
     setOptions((prev) => ({ ...prev, ...patch }));
@@ -196,6 +212,7 @@ export function BannerResizeView() {
           plan,
           size,
           preserveText: opts.preserveText,
+          preserveProduct: opts.preserveProduct,
           generatedWidth: rendered.generatedWidth,
           generatedHeight: rendered.generatedHeight,
           bandShifted: rendered.bandShifted,
@@ -338,16 +355,20 @@ export function BannerResizeView() {
     }
   };
 
-  const fileNameFor = (item: BannerResultItem) => {
+  const fileNameFor = (item: BannerResultItem, fmt: BannerOutputFormat) => {
     const base = safeFileName(
       resultSource?.fileName.replace(/\.[^.]+$/, "") || "banner"
     );
-    return `${base}_${item.size.width}x${item.size.height}.png`;
+    return `${base}_${item.size.width}x${item.size.height}.${OUTPUT_FORMATS[fmt].ext}`;
   };
 
-  const downloadOne = (item: BannerResultItem) => {
+  const downloadOne = async (item: BannerResultItem) => {
     if (!item.imageDataUrl) return;
-    downloadDataUrl(fileNameFor(item), item.imageDataUrl);
+    // 미리보기는 PNG 를 그대로 쓰고, 저장하는 순간에만 선택 포맷으로 다시 인코딩한다.
+    // 브라우저가 WebP 를 못 만들면 encodeForDownload 가 PNG 로 폴백하므로
+    // 파일명 확장자도 실제 적용된 포맷을 따라간다.
+    const out = await encodeForDownload(item.imageDataUrl, outFormat);
+    downloadDataUrl(fileNameFor(item, out.format), out.dataUrl);
   };
 
   /** ZIP 대신 순차 다운로드 — 새 의존성 없이 기획서의 "전체 다운로드"를 만족시킨다 */
@@ -355,7 +376,7 @@ export function BannerResizeView() {
     const targets = items.filter((i) => i.status === "done" && i.imageDataUrl);
     if (targets.length === 0) return;
     for (const item of targets) {
-      downloadOne(item);
+      await downloadOne(item);
       await sleep(DOWNLOAD_GAP_MS);
     }
     toast.success(`${targets.length}개 이미지를 내려받았습니다.`);
@@ -521,7 +542,12 @@ export function BannerResizeView() {
                 onRegenerate={(item, useModel) => {
                   void handleRegenerate(item, useModel);
                 }}
-                onDownload={downloadOne}
+                onDownload={(item) => {
+                  void downloadOne(item);
+                }}
+                format={outFormat}
+                onFormatChange={setOutFormat}
+                pngBytes={firstDonePngBytes}
                 onDownloadSelected={() => {
                   void downloadMany(
                     results.filter((i) => selectedIds.has(i.id))

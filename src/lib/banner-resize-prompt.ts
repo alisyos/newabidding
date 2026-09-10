@@ -75,6 +75,12 @@ export function buildResizePrompt(
   const surface = cropped ? "artboard" : "canvas";
   const artboard = `${plan.bandWidth}x${plan.bandHeight}`;
 
+  // 목표 규격에서 8px 로 보이려면 생성 캔버스에서 몇 px 이어야 하는지.
+  // 최종 렌더가 밴드(bandHeight)를 목표 높이로 축소하므로 그 배율을 곱한다.
+  const legibilityScale = plan.bandHeight / size.height;
+  const minLegalPx = Math.max(8, Math.round(8 * legibilityScale));
+  const safeMarginPx = Math.max(10, Math.round(10 * legibilityScale));
+
   lines.push(
     "You are an art director adapting an existing advertising banner to a new ad slot.",
     "",
@@ -105,6 +111,9 @@ export function buildResizePrompt(
     "- For a wide, short slot: put the key visual on one side and stack the copy beside it in a horizontal reading order.",
     "- For a tall, narrow slot: stack the elements vertically with clear hierarchy.",
     `- Fill the entire ${cropped ? "ARTBOARD" : "canvas"} edge to edge. No empty side panels, no borders, no frame, no letterboxing.`,
+    "- Keep the copy block and the product shot in separate zones: the product must never sit inside or across a line of text, and must never break a sentence into two pieces. On a wide, short slot, place the copy flush left and put the product between the end of the copy block and the call-to-action.",
+    "- All type runs horizontally. No vertical, rotated or arced text anywhere, including on the product's own surface.",
+    "- Underlines, swashes and other decorative strokes must stay within the copy block they belong to — they must not run out into the margin or cross another element.",
     `- ${COMPOSITION_HINT[options.composition] ?? COMPOSITION_HINT.auto}`
   );
 
@@ -113,7 +122,7 @@ export function buildResizePrompt(
   ];
   if (options.preserveProduct) {
     keep.push(
-      "Reproduce the product, packaging and any people exactly as they look in the reference — same shape, colour, material and branding. You may reposition and rescale them, but never restyle or redesign them."
+      "Reproduce the product, packaging and any people exactly as they look in the reference — same shape, colour, material and branding. You may reposition and rescale them, but never restyle or redesign them. (Reproducing the packaging does NOT mean reproducing its fine print — see the microprint rule below.)"
     );
   }
   if (options.preserveLogo) {
@@ -149,6 +158,34 @@ export function buildResizePrompt(
     );
   }
 
+  // 문구 지시를 한 덩어리로 두면 모델이 "모든 글자를 그대로 재현" 을
+  // 패키지 표면의 5px 미세 인쇄(원료명·함량·인증마크)까지 적용해,
+  // 판독 불가한 크기에 글자 모양만 흉내 낸 깨진 문자를 만들어 낸다.
+  // (아커만시아 → "▪구시티필라", 1포당 800.5mg → "omma fied" 같은 오기)
+  // 건강기능식품 표시·광고 심의에서 바로 문제가 되는 지점이라
+  // "헤드라인 카피" 와 "표면 미세 인쇄" 를 두 계층으로 분리해
+  // 후자는 아예 빈 면으로 남기도록 지시한다.
+  lines.push(
+    "",
+    "TWO KINDS OF TEXT — TREAT THEM DIFFERENTLY:",
+    "- HEADLINE COPY (the advertising message, the call-to-action button, the brand logotype and the legal notice line): reproduce this exactly, and render it large enough to be read.",
+    "- SURFACE MICROPRINT (the printed matter on the product packaging itself: ingredient names, dosage and volume figures, nutrition tables, barcodes, certification seals and any fine print on a pouch, tube, box or bottle): you will NOT be able to render this legibly at this scale, and a wrong ingredient name or a wrong dosage figure makes the banner illegal to publish.",
+    "- So for SURFACE MICROPRINT: do NOT attempt to draw letter shapes. Leave those areas as clean, empty, unprinted surface that follows the package's own perspective, curvature, lighting and shading, or let them fall softly out of focus. Blank is correct. Invented lettering is a failure.",
+    "- Never invent, guess or approximate any ingredient name, percentage, milligram or CFU figure, certification mark or seal text that you cannot read with certainty in the reference."
+  );
+
+  // 심의·법적 고지 문구는 규격이 작아질수록 먼저 희생된다.
+  // 300x250 에서 5px 로 렌더돼 판독 불가였던 사례가 있어
+  // 생성 캔버스 기준 최소 픽셀을 환산해 하한으로 못박는다.
+  lines.push(
+    "",
+    "LEGIBILITY FLOOR — NOTHING MAY BE SMALLER THAN THIS:",
+    `- The legal / regulatory notice line (for example a Korean advertising-review notice such as 「건강기능식품광고 | 광고심의필」) must be rendered at a cap height of at least ${minLegalPx}px on this canvas, so that it stays readable after the banner is scaled down to ${size.width}x${size.height}.`,
+    "- Give it strong contrast against whatever sits behind it: near-opaque white type, or a subtle dark gradient scrim behind it on a busy background.",
+    `- Keep it inside a ${safeMarginPx}px safe margin from the bottom-left corner of the ${surface}, and never let the product, a decorative shape or a button overlap it.`,
+    "- If a piece of text cannot fit at that minimum size, make the layout give it room — never shrink it below the floor and never drop it."
+  );
+
   const sourceText = options.sourceText.trim();
   if (sourceText) {
     lines.push(
@@ -172,6 +209,20 @@ export function buildResizePrompt(
       "If something does not fit inside the artboard, scale it down or re-arrange the composition — never let it run out into the bleed."
     );
   }
+
+  // 두 모델 API 모두 negative_prompt 필드가 없어, 금지 항목을 본문 부정형으로 넣는다.
+  // (위 REDESIGN·BLEED 지시와 같은 방식)
+  lines.push(
+    "",
+    "DO NOT PRODUCE ANY OF THE FOLLOWING:",
+    "- garbled, misspelled, half-formed or nonsense lettering anywhere in the image",
+    "- invented ingredient names, dosage figures, nutrition tables or barcodes",
+    "- fabricated certification seals, award badges or review-approval marks",
+    "- watermarks, signatures or stock-image marks",
+    "- extra duplicate products that are not in the reference",
+    "- warped, melted or distorted package geometry",
+    "- a cluttered background that competes with the copy"
+  );
 
   lines.push(
     "",

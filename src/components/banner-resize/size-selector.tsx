@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  ALL_PRESETS,
   MAX_SIZES,
   SIZE_PRESET_GROUPS,
   SIZE_RANGE,
   customSize,
   estimateCropLoss,
   formatRatio,
+  nearStandardPreset,
 } from "@/lib/banner-resize-spec";
 import { cn } from "@/lib/utils";
 import type { BannerModelKey, BannerSize } from "@/types/banner-resize";
@@ -40,6 +42,8 @@ export function SizeSelector({
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [customError, setCustomError] = useState("");
+  /** 비표준 규격 안내 — 차단이 아니라 참고 문구이므로 에러와 따로 둔다 */
+  const [customNotice, setCustomNotice] = useState("");
 
   const selectedIds = new Set(value.map((s) => s.id));
   const full = value.length >= MAX_SIZES;
@@ -59,6 +63,7 @@ export function SizeSelector({
 
     if (!Number.isFinite(w) || !Number.isFinite(h)) {
       setCustomError("가로·세로를 숫자로 입력해주세요.");
+      setCustomNotice("");
       return;
     }
     if (
@@ -70,21 +75,37 @@ export function SizeSelector({
       setCustomError(
         `각 변은 ${SIZE_RANGE.min}~${SIZE_RANGE.max}px 사이여야 합니다.`
       );
+      setCustomNotice("");
       return;
     }
     const next = customSize(w, h);
     if (selectedIds.has(next.id)) {
       setCustomError("이미 선택한 규격입니다.");
+      setCustomNotice("");
       return;
     }
     if (full) {
       setCustomError(`규격은 한 번에 최대 ${MAX_SIZES}개까지 선택할 수 있습니다.`);
+      setCustomNotice("");
       return;
     }
     onChange([...value, next]);
     setWidth("");
     setHeight("");
     setCustomError("");
+
+    // 프리셋에 그대로 있는 값이면 안내할 게 없다.
+    if (ALL_PRESETS.some((p) => p.id === next.id)) {
+      setCustomNotice("");
+      return;
+    }
+    // 프리셋과 거의 같은 값이면 오타 가능성이 높아 표준 규격을 알려준다.
+    const near = nearStandardPreset({ width: w, height: h });
+    setCustomNotice(
+      near
+        ? `${w}×${h} 은 표준 규격 ${near.width}×${near.height} (${near.label})과 거의 같습니다. 매체 규격서를 확인해주세요.`
+        : `${w}×${h} 은 프리셋에 없는 비표준 규격입니다. 집행 지면의 매체 규격서와 일치하는지 확인해주세요.`
+    );
   };
 
   return (
@@ -183,6 +204,12 @@ export function SizeSelector({
         </div>
         {customError && (
           <p className="text-xs font-medium text-destructive">{customError}</p>
+        )}
+        {customNotice && (
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>{customNotice}</span>
+          </p>
         )}
       </div>
 

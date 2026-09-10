@@ -142,3 +142,6 @@ export type BannerResizeErrorCode =
   | "UPSTREAM_ERROR"
   | "EMPTY_RESULT"
   | "UNKNOWN";
+
+/** 결과 다운로드 포맷 — 값 목록과 인코딩은 banner-canvas.ts 의 OUTPUT_FORMATS 에 있다 */
+export type BannerOutputFormat = "png" | "jpeg" | "webp";

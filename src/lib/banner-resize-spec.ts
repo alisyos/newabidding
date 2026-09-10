@@ -347,3 +347,33 @@ export function formatBytes(bytes: number): string {
 export function customSize(width: number, height: number): BannerSize {
   return { id: `${width}x${height}`, width, height, label: "직접 입력" };
 }
+
+/**
+ * 직접 입력한 규격이 표준 프리셋과 거의 같으면 그 프리셋을 돌려준다.
+ * 1197x600 처럼 오타·구버전 규격서로 들어온 값을 잡아 매체 규격서 확인을 유도한다.
+ * (차단이 아니라 안내용이므로 판정은 느슨하게 상대 오차로 본다)
+ */
+export function nearStandardPreset(
+  size: { width: number; height: number },
+  tolerance = 0.05
+): BannerSize | null {
+  const exactId = `${size.width}x${size.height}`;
+
+  // 허용치 안의 "첫" 프리셋이 아니라 "가장 가까운" 프리셋을 고른다.
+  // 배열 순서에 의존하면 1197x600 이 1200x600(메인 배너) 대신
+  // 목록에서 먼저 나오는 1200x628(가로형)로 잡힌다.
+  let best: BannerSize | null = null;
+  let bestError = Infinity;
+  for (const p of ALL_PRESETS) {
+    // 완전 일치는 프리셋 그 자체이므로 안내할 필요가 없다
+    if (p.id === exactId) continue;
+    const dw = Math.abs(size.width - p.width) / p.width;
+    const dh = Math.abs(size.height - p.height) / p.height;
+    if (dw > tolerance || dh > tolerance) continue;
+    if (dw + dh < bestError) {
+      bestError = dw + dh;
+      best = p;
+    }
+  }
+  return best;
+}

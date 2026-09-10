@@ -19,6 +19,7 @@ import {
 } from "@/lib/banner-resize-spec";
 import type {
   BannerGenerationPlan,
+  BannerOutputFormat,
   BannerSize,
   BannerSource,
 } from "@/types/banner-resize";
@@ -38,6 +39,12 @@ const CONTENT_THRESHOLD = 0.12;
 
 /** 생성 결과에서 이 비율(%) 이하만 살아남으면 "극단적인 규격" 으로 보고 경고한다 */
 const EXTREME_CROP_KEPT = 80;
+
+/**
+ * 이 높이 아래 규격에서는 8px 문구가 전체 높이의 3% 를 넘어
+ * 심의·법적 고지 문구를 판독 가능한 크기로 넣을 자리가 안 나온다. (300x250·320x100 등)
+ */
+const SMALL_CANVAS_HEIGHT = 260;
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -412,6 +419,58 @@ export async function renderFinal(args: {
 }
 
 /**
+ * 다운로드용 출력 포맷.
+ * 최종 결과는 RGBA PNG 라 1200x600 이 1MB 를 넘고 다수 지면의 용량 기준을 초과한다.
+ * JPG q85 / WebP q82 는 같은 소재를 80~90% 작게 만든다. (알파는 실제로 쓰이지 않는다)
+ */
+export const OUTPUT_FORMATS: Record<
+  BannerOutputFormat,
+  { mime: string; ext: string; quality?: number; label: string }
+> = {
+  png: { mime: "image/png", ext: "png", label: "PNG (무손실 · 투명 지원)" },
+  jpeg: { mime: "image/jpeg", ext: "jpg", quality: 0.85, label: "JPG q85 (권장 · 용량 최소)" },
+  webp: { mime: "image/webp", ext: "webp", quality: 0.82, label: "WebP q82 (최소 용량)" },
+};
+
+/**
+ * 결과 PNG 를 다운로드 포맷으로 다시 인코딩한다.
+ * JPG·WebP 는 알파가 필요 없으므로 흰 바탕을 먼저 채워 RGB 로 플래튼한다.
+ * (buildModelInput() 과 같은 이유 — 투명 영역이 검게 깔리는 것을 막는다)
+ *
+ * 브라우저가 해당 포맷을 지원하지 않으면 toDataURL 이 조용히 PNG 를 돌려주므로,
+ * 반환값 prefix 를 검사해 실제 포맷을 함께 알려준다. (파일명 확장자를 맞추는 데 쓴다)
+ */
+export async function encodeForDownload(
+  pngDataUrl: string,
+  format: BannerOutputFormat
+): Promise<{ dataUrl: string; format: BannerOutputFormat }> {
+  // PNG 는 결과 그대로가 정답이라 재인코딩 비용을 들이지 않는다
+  if (format === "png") return { dataUrl: pngDataUrl, format: "png" };
+
+  const { mime, quality } = OUTPUT_FORMATS[format];
+  try {
+    const img = await loadImage(pngDataUrl);
+    const width = Math.max(1, img.naturalWidth);
+    const height = Math.max(1, img.naturalHeight);
+
+    const { canvas, ctx } = createCanvas(width, height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const dataUrl = canvas.toDataURL(mime, quality);
+    // 미지원 포맷이면 브라우저가 조용히 PNG 를 돌려준다 → 확장자가 어긋나지 않게 폴백
+    if (!dataUrl.startsWith(`data:${mime}`)) {
+      return { dataUrl: pngDataUrl, format: "png" };
+    }
+    return { dataUrl, format };
+  } catch {
+    // 인코딩이 실패해도 다운로드 자체는 되어야 하므로 원본 PNG 로 돌아간다
+    return { dataUrl: pngDataUrl, format: "png" };
+  }
+}
+
+/**
  * 자동 검수 (기획서 14장).
  * 추측 대신 확정적으로 알 수 있는 사실만 경고로 남긴다.
  */
@@ -419,6 +478,7 @@ export function buildWarnings(args: {
   plan: BannerGenerationPlan;
   size: BannerSize;
   preserveText: boolean;
+  preserveProduct: boolean;
   generatedWidth: number;
   generatedHeight: number;
   bandShifted: boolean;
@@ -429,6 +489,7 @@ export function buildWarnings(args: {
     plan,
     size,
     preserveText,
+    preserveProduct,
     generatedWidth,
     generatedHeight,
     bandShifted,
@@ -481,6 +542,22 @@ export function buildWarnings(args: {
       ? "레이아웃을 재구성하면서 문구도 다시 그려집니다. 오탈자가 없는지 확인해주세요. (고급 설정의 '원본 문구'를 채우면 정확도가 올라갑니다)"
       : "원본 문구 유지가 꺼져 있어 문구가 원본과 달라질 수 있습니다."
   );
+
+  // 규격만으로 확정되는 사실 — 8px 하한을 지켜도 이 높이에서는 전체의 3% 를 넘어
+  // 고지 문구가 판독 불가한 크기로 렌더될 수밖에 없다.
+  if (size.height <= SMALL_CANVAS_HEIGHT) {
+    warnings.push(
+      `세로 ${size.height}px 규격은 심의·법적 고지 문구가 판독 불가한 크기로 렌더될 수 있습니다. 확대해서 문구가 읽히는지 확인하고, 필요하면 문구만 별도 레이어로 다시 얹어주세요.`
+    );
+  }
+
+  // 옵션만으로 확정되는 사실 — preserveProduct 가 켜져 있으면 프롬프트가
+  // 패키지 미세 인쇄를 빈 면으로 남기도록 지시하므로 표시사항은 반드시 사람이 채워야 한다.
+  if (preserveProduct) {
+    warnings.push(
+      "제품 패키지의 원료명·함량·인증마크 같은 미세 인쇄는 AI가 판독 가능한 크기로 재현할 수 없어 빈 면으로 처리하도록 지시했습니다. 확대해서 깨진 글자가 없는지 확인하고, 표시사항은 정식 패키지 아트워크로 합성해주세요."
+    );
+  }
 
   return warnings;
 }
