@@ -11,7 +11,7 @@ export function Header() {
         {/* 로고 영역 */}
         <div className="flex items-center space-x-2">
           <Link href="/" className="text-xl font-bold text-gray-900">
-            지피티코리아
+            DMP코리아
           </Link>
         </div>
 

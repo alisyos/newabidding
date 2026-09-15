@@ -73,7 +73,7 @@ export function AdCopyForm({
           <Label htmlFor="ac-brand">브랜드/상호명</Label>
           <Input
             id="ac-brand"
-            placeholder="예: 지피티코리아"
+            placeholder="예: DMP코리아"
             value={value.brandName}
             onChange={(e) => onChange({ brandName: e.target.value })}
           />

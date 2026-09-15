@@ -482,13 +482,12 @@ export const CONTACT_SUCCESS_BODY =
 
 /* ---------------------------------------------------------------- 푸터 */
 
-// TODO(영업/법무): 실제 사업자정보와 방침 문서 링크로 교체한다.
 export const FOOTER_INFO: FooterInfo = {
-  company: "주식회사 지피티코리아",
-  ceo: "홍길동",
-  businessNumber: "000-00-00000",
-  mailOrderNumber: "제0000-서울강남-00000호",
-  address: "서울특별시 강남구 테헤란로 000, 00층",
-  tel: "02-0000-0000",
-  email: "contact@example.com",
+  company: "(주)디엠피코리아",
+  ceo: "김형준",
+  businessNumber: "119-86-73780",
+  mailOrderNumber: "제2013-서울금천-0582호",
+  address: "서울시 금천구 벚꽃로 286 삼성리더스타워 803-1",
+  tel: "02-855-0529",
+  email: "team_sp@dmpkorea.co.kr",
 };

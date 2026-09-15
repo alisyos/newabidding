@@ -22,14 +22,16 @@ export function CrawlingFooter() {
       <div className="container mx-auto px-4">
         <p className="text-sm font-bold text-white">{info.company}</p>
 
-        <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs">
-          <li>대표 {info.ceo}</li>
-          <li>사업자등록번호 {info.businessNumber}</li>
-          <li>통신판매업신고 {info.mailOrderNumber}</li>
-          <li>{info.address}</li>
-          <li>대표전화 {info.tel}</li>
-          <li>{info.email}</li>
-        </ul>
+        {/* 사업자정보 표기는 사업자등록증 기재 문구·순서를 그대로 따른다 */}
+        <div className="mt-4 space-y-1 break-keep text-xs leading-relaxed">
+          <p>
+            {info.address} ｜ Tel : {info.tel} ｜ 대표이사 {info.ceo}
+          </p>
+          <p>
+            사업자등록번호 : {info.businessNumber} | 통신판매업신고번호 :{" "}
+            {info.mailOrderNumber} | E-mail : {info.email}
+          </p>
+        </div>
 
         <ul className="mt-6 flex flex-wrap gap-5 border-t border-white/10 pt-6 text-xs">
           {POLICY_LINKS.map((link) => (
